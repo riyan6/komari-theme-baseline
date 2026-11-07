@@ -51,9 +51,10 @@ console.log(`\nPackaging theme into ${zipFileName}...`);
 
 const isWindows = process.platform === "win32";
 if (isWindows) {
-  // Use PowerShell Compress-Archive
-  const psCommand = `powershell -NoProfile -Command "Compress-Archive -Path 'preview.webp', 'komari-theme.json', 'dist' -DestinationPath '${zipFileName}' -Force"`;
-  execSync(psCommand, { stdio: "inherit" });
+  // 必须用 bsdtar 生成标准 zip：Windows 的 Compress-Archive 会把条目写成
+  // 反斜杠路径（dist\index.html），Komari 在 Linux 上解压会找不到 dist/index.html，
+  // 导致主题加载失败回退默认主题。tar -a 会生成正斜杠路径的标准 zip。
+  execSync(`tar -a -c -f "${zipFileName}" preview.webp komari-theme.json dist`, { stdio: "inherit" });
 } else {
   // Use Unix zip
   execSync(`zip -r "${zipFileName}" preview.webp komari-theme.json dist/`, { stdio: "inherit" });
