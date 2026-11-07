@@ -1,0 +1,419 @@
+/* ─── Font Switching Rules (data-font) ───────────────────────────────────── */
+/* Note on tabular numbers:
+   - Inter Tight Variable supports 'tnum' via OpenType features and tabular-nums.
+   - Geist Variable supports 'tnum' via OpenType features and tabular-nums.
+   - Space Grotesk Variable supports tabular figures via tabular-nums;
+     fixed column widths (w-[110px]) and whitespace-nowrap are additionally enforced
+     so numeric columns never jitter or shift under any font.
+*/
+:root, html, html[data-font="inter-tight"] {
+  --font-current-sans: "Inter Tight Variable", "Noto Sans SC", system-ui, sans-serif;
+  --display-weight: 700;
+  --display-tracking: -0.04em;
+  --body-tracking: 0em;
+}
+
+html[data-font="geist"] {
+  --font-current-sans: "Geist Variable", "Noto Sans SC", system-ui, sans-serif;
+  --display-weight: 700;
+  --display-tracking: -0.05em;
+  --body-tracking: 0em;
+}
+
+html[data-font="space-grotesk"] {
+  --font-current-sans: "Space Grotesk Variable", "Noto Sans SC", system-ui, sans-serif;
+  --display-weight: 600;
+  --display-tracking: -0.03em;
+  --body-tracking: -0.005em;
+}
+
+/* ─── Swiss International Typographic Style (Palette & Overrides) ────────── */
+:root, :root[data-theme="light"], html:not(.dark) {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #F7F7F7;
+  --border: #E5E5E5;
+  --border-strong: #000000;
+  --fg: #000000;
+  --muted: #6B6B6B;
+  --accent: #000000;
+  --ok: #000000;
+  --danger: #E5001C;
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--fg);
+  --primary-foreground: var(--bg);
+  --secondary: var(--border);
+  --secondary-foreground: var(--fg);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--bg);
+  --destructive: var(--danger);
+  --input: var(--border);
+  --ring: var(--fg);
+  --radius: 0px;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"], html.dark {
+  --bg: #0A0A0A;
+  --surface: #0A0A0A;
+  --surface-2: #141414;
+  --border: #262626;
+  --border-strong: #F2F2F2;
+  --fg: #F2F2F2;
+  --muted: #8C8C8C;
+  --accent: #F2F2F2;
+  --ok: #F2F2F2;
+  --danger: #E5001C;
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--fg);
+  --primary-foreground: var(--bg);
+  --secondary: var(--border);
+  --secondary-foreground: var(--fg);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--bg);
+  --destructive: var(--danger);
+  --input: var(--border);
+  --ring: var(--fg);
+  --radius: 0px;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--fg);
+  --color-primary-foreground: var(--bg);
+  --color-secondary: var(--border);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--bg);
+  --color-destructive: var(--danger);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--fg);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --font-sans: var(--font-current-sans);
+  --font-mono: var(--font-current-sans);
+  --font-serif: var(--font-current-sans);
+}
+
+/* ─── Global Swiss Rules (0px radius, No shadows, No gradients) ──────────── */
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html, body {
+  margin: 0;
+  color: var(--fg);
+  background-color: var(--bg);
+  font-family: var(--font-current-sans);
+  letter-spacing: var(--body-tracking);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+  font-feature-settings: "tnum", "cv11", "ss01";
+}
+
+/* ─── Typography Hierarchy Specification (编码字体规范 · 7 级字阶) ───────────
+ * Level 1 [hero]    : clamp(96px, 12vw, 168px) — 首页核心在线主数字 (StatusHero 左侧)
+ * Level 2 [stat]    : 42px                     — 首页二级汇总大数字 (StatusHero 右侧速率/流量)
+ * Level 3 [title]   : 18px / 600               — 顶栏站点品牌名、空状态主标题
+ * Level 4 [value]   : 16px / 600               — 节点名称、地区代码、表格主数值 (负载/百分比/运行时间/账单价格)
+ * Level 5 [control] : 14px / 500-600           — 搜索/排序/视图控件、Hero 状态与上下行摘要、节点计数、主按钮
+ * Level 6 [label]   : 13px / 600 / +0.05em     — 区块小标题、工具栏标签、分组胶囊、顶栏状态/语言/字体项、表格表头
+ * Level 7 [meta]    : 13px / 500 (紧凑处 12px)  — 表格行内副文本 (在线状态/实时上下行速率/账单剩余天数)、页脚信息
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --font-size-hero: clamp(96px, 12vw, 168px);
+  --font-size-stat: 42px;
+  --font-size-title: 18px;
+  --font-size-value: 16px;
+  --font-size-control: 14px;
+  --font-size-label: 13px;
+  --font-size-meta: 13px;
+  --font-size-caption: 12px;
+}
+
+/* Level 1: Hero 主数字 */
+.type-hero,
+.main-number {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-hero);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 0.9;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Level 2: Stat 次级汇总大数字 */
+.type-stat,
+.sub-number {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-stat);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 1;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Level 3: 品牌名 / 区块主标题 */
+.type-title {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.25;
+}
+
+/* Level 4: 表格核心主数值 & 节点名 */
+.type-value,
+.table-value {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-value);
+  font-weight: 600;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.3;
+  white-space: nowrap;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+.node-name {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-value);
+  font-weight: 600;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.3;
+}
+
+/* Level 5: 交互控件 / 状态摘要 / 计数 */
+.type-control {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-control);
+  font-weight: 500;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.4;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Level 6: 区块标签 / 顶栏状态 / 分组胶囊 / 表格表头 */
+.type-label,
+.label-swiss,
+.type-table-head {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  letter-spacing: calc(0.05em + var(--body-tracking));
+  text-transform: uppercase;
+  line-height: 1.35;
+}
+
+.label-swiss,
+.type-table-head {
+  color: var(--muted);
+}
+
+/* Level 7: 辅助副文本 / 行内次级信息 / 页脚 */
+.type-meta {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-meta);
+  font-weight: 500;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.35;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+.type-caption {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  letter-spacing: var(--body-tracking);
+  line-height: 1.35;
+  font-feature-settings: "tnum", "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Controls: height 42px, 1px solid stroke, square, 14px font ─────────── */
+.swiss-input, .swiss-select, .swiss-btn {
+  height: 42px;
+  border: 1px solid #000000;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-control);
+  font-weight: 500;
+  letter-spacing: var(--body-tracking);
+  outline: none;
+  transition: border-color 100ms ease-out;
+}
+
+:root[data-theme="dark"] .swiss-input,
+:root[data-theme="dark"] .swiss-select,
+:root[data-theme="dark"] .swiss-btn,
+html.dark .swiss-input,
+html.dark .swiss-select,
+html.dark .swiss-btn {
+  border-color: #262626;
+}
+
+.swiss-input:focus, .swiss-select:focus, .swiss-btn:focus-visible {
+  border-color: var(--fg);
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+/* Main Button (Admin panel) */
+.btn-swiss-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  background-color: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-control);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--fg);
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+  cursor: pointer;
+}
+
+.btn-swiss-primary:hover {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+/* Status Squares */
+.status-square-online {
+  width: 6px;
+  height: 6px;
+  background-color: var(--fg);
+  display: inline-block;
+  flex: 0 0 6px;
+}
+
+.status-square-offline {
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--danger);
+  background-color: transparent;
+  display: inline-block;
+  flex: 0 0 6px;
+}
+
+/* 4px Solid Progress Bar */
+.swiss-progress-track {
+  height: 4px;
+  background-color: #EDEDED;
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-theme="dark"] .swiss-progress-track,
+html.dark .swiss-progress-track {
+  background-color: #262626;
+}
+
+.swiss-progress-fill {
+  height: 100%;
+  background-color: var(--fg);
+  transition: width 120ms ease-out;
+}
+
+.swiss-progress-fill.is-warning {
+  background-color: var(--danger) !important;
+}
+
+/* Live Tick Blink */
+.live-tick {
+  animation: live-square-blink 400ms ease-out 1;
+}
+
+@keyframes live-square-blink {
+  0% { opacity: 0.1; }
+  50% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* ─── Instance Detail (Swiss) ─────────────────────────────────────────────── */
+:root {
+  --km-instance-max-width: 1200px;
+  --km-instance-gutter: 32px;
+  --km-instance-grid-gap: 48px;
+  --km-instance-rule: #000000;
+  --km-instance-hairline: #000000;
+  --km-instance-hairline-soft: #E5E5E5;
+  --km-instance-muted: #6B6B6B;
+  --km-instance-alert: #E5001C;
+  --km-instance-progress-bg: #EDEDED;
+  --km-chart-line: #000000;
+  --km-chart-grid: #E5E5E5;
+  --km-chart-tick: #6B6B6B;
+  --km-chart-hover: #000000;
+}
+
+html.dark,
+:root[data-theme="dark"] {
+  --km-instance-rule: #F2F2F2;
+  --km-instance-hairline: #F2F2F2;
+  --km-instance-hairline-soft: #262626;
+  --km-instance-muted: #8C8C8C;
+  --km-instance-progress-bg: #262626;
+  --km-chart-line: #F2F2F2;
+  --km-chart-grid: #262626;
+  --km-chart-tick: #8C8C8C;
+  --km-chart-hover: #F2F2F2;
+}
+
+.km-chart-block .recharts-cartesian-axis-tick-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
