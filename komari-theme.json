@@ -1,10 +1,10 @@
 {
   "name": "Komari Theme",
   "short": "komari-theme",
-  "description": "Komari Web UI Theme",
-  "version": "1.0.0",
-  "author": "Akizon77",
-  "url": "https://github.com/komari-monitor/komari-web",
+  "description": "Personal Komari theme (public status page).",
+  "version": "1.0.1",
+  "author": "riyan6",
+  "url": "https://github.com/riyan6/komari-theme-baseline",
   "preview": "preview.webp",
   "configuration": {
     "type": "managed",
