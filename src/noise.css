@@ -7,21 +7,21 @@
      so numeric columns never jitter or shift under any font.
 */
 :root, html, html[data-font="inter-tight"] {
-  --font-current-sans: "Inter Tight Variable", "Noto Sans SC", system-ui, sans-serif;
+  --font-current-sans: "Inter Tight Variable", "Noto Sans SC Variable", system-ui, sans-serif;
   --display-weight: 700;
   --display-tracking: -0.04em;
   --body-tracking: 0em;
 }
 
 html[data-font="geist"] {
-  --font-current-sans: "Geist Variable", "Noto Sans SC", system-ui, sans-serif;
+  --font-current-sans: "Geist Variable", "Noto Sans SC Variable", system-ui, sans-serif;
   --display-weight: 700;
   --display-tracking: -0.05em;
   --body-tracking: 0em;
 }
 
 html[data-font="space-grotesk"] {
-  --font-current-sans: "Space Grotesk Variable", "Noto Sans SC", system-ui, sans-serif;
+  --font-current-sans: "Space Grotesk Variable", "Noto Sans SC Variable", system-ui, sans-serif;
   --display-weight: 600;
   --display-tracking: -0.03em;
   --body-tracking: -0.005em;

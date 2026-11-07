@@ -2,9 +2,7 @@ import React, { StrictMode, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter-tight";
 import "@fontsource-variable/space-grotesk";
-import "@fontsource/noto-sans-sc/400.css";
-import "@fontsource/noto-sans-sc/500.css";
-import "@fontsource/noto-sans-sc/700.css";
+import "@fontsource-variable/noto-sans-sc";
 
 // Preload on-demand fonts before mount (inter-tight / space-grotesk are static; geist is lazy)
 const earlyFont = typeof document !== "undefined" ? document.documentElement.getAttribute("data-font") : null;

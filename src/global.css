@@ -63,7 +63,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-current-sans, "Inter Tight Variable", "Noto Sans SC", system-ui, sans-serif);
+  --font-sans: var(--font-current-sans, "Inter Tight Variable", "Noto Sans SC Variable", system-ui, sans-serif);
 
   /* 间距语义档位（见下方「间距系统」）：生成 gap-km-block / p-km-section / mt-km-group … */
   --spacing-km-inline: var(--space-1);
@@ -270,7 +270,7 @@ body, * {
   font-family: var(
     --km-editor-font-family,
     "Cascadia Mono",
-    "Noto Sans SC",
+    "Noto Sans SC Variable",
     monospace
   );
 }
