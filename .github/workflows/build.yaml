@@ -1,20 +1,23 @@
 name: Build and Release Assets
 
 on:
-  release:
-    types: [created] # 创建新的 Release 时触发
+  # 推一个 tag（如 v1.0.1）即自动构建并发布 Release
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "要构建并上传到的 Release tag（手动触发时必填）"
+        description: "要构建并发布到的 tag（手动触发时必填，例如 v1.0.2）"
         required: true
         type: string
 
+permissions:
+  contents: write # 创建 Release / 上传附件所需
+
 jobs:
-  build_and_upload:
+  build_and_release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # 写入 Release 附件所需
 
     steps:
       - name: Checkout repository
@@ -51,10 +54,20 @@ jobs:
           cd ..
           ls -la dist-release.zip
 
-      - name: Upload Release Asset
+      - name: Create or update Release with theme package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
         run: |
-          gh release upload "$RELEASE_TAG" dist-release.zip \
-            --repo "$GITHUB_REPOSITORY" --clobber
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist-release.zip \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" dist-release.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG" \
+              --generate-notes \
+              --latest
+          fi
