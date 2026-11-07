@@ -1,21 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Moon, Sun, ArrowUpRight, Table2, LayoutGrid } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Moon, Sun, ArrowUpRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { usePublicInfo } from '@/contexts/PublicInfoContext'
 import { useNoiseProbe } from '@/hooks/useNoiseProbe'
 import { useNoisePreferences } from '@/lib/noise-store'
-import { FontSwitcher } from '@/components/FontSwitcher'
 import { writeLanguageCookie } from '@/utils/language'
 
 const NavBar: React.FC = () => {
   const { t, i18n } = useTranslation()
-  const location = useLocation()
   const { publicInfo } = usePublicInfo()
   const { stale, updatedAt } = useNoiseProbe()
-  const { theme, setTheme, setLang, statusViewMode, setStatusViewMode } =
-    useNoisePreferences()
-  const isHome = location.pathname === '/'
+  const { theme, setTheme, setLang } = useNoisePreferences()
   const [ticking, setTicking] = useState(false)
   const prevTickRef = useRef(updatedAt)
 
@@ -92,43 +88,6 @@ const NavBar: React.FC = () => {
               中
             </button>
           </div>
-
-          {/* View Switcher (Table / Card) on Homepage */}
-          {isHome && (
-            <div className="inline-flex h-[38px] items-stretch border border-black bg-white dark:border-[#262626] dark:bg-[#0A0A0A]">
-              <button
-                type="button"
-                onClick={() => setStatusViewMode('table')}
-                aria-label={t('status.view_table')}
-                title={t('status.view_table')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 type-label cursor-pointer border-0 transition-colors ${
-                  statusViewMode === 'table'
-                    ? 'bg-black text-white dark:bg-[#F2F2F2] dark:text-black'
-                    : 'bg-white text-[#6B6B6B] hover:text-black hover:bg-[#F7F7F7] dark:bg-[#0A0A0A] dark:text-[#8C8C8C] dark:hover:text-[#F2F2F2] dark:hover:bg-[#141414]'
-                }`}
-              >
-                <Table2 size={14} />
-                <span className="hidden sm:inline">{t('status.view_table')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusViewMode('card')}
-                aria-label={t('status.view_card')}
-                title={t('status.view_card')}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 type-label cursor-pointer border-0 border-l border-black dark:border-[#262626] transition-colors ${
-                  statusViewMode === 'card'
-                    ? 'bg-black text-white dark:bg-[#F2F2F2] dark:text-black'
-                    : 'bg-white text-[#6B6B6B] hover:text-black hover:bg-[#F7F7F7] dark:bg-[#0A0A0A] dark:text-[#8C8C8C] dark:hover:text-[#F2F2F2] dark:hover:bg-[#141414]'
-                }`}
-              >
-                <LayoutGrid size={14} />
-                <span className="hidden sm:inline">{t('status.view_card')}</span>
-              </button>
-            </div>
-          )}
-
-          {/* Font Switcher */}
-          <FontSwitcher />
 
           {/* Theme Toggle: icon only, no border/circle */}
           <button

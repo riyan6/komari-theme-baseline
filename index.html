@@ -32,20 +32,10 @@
         }
 
         try {
-          const rawFont = localStorage.getItem("font-preference");
-          if (rawFont) {
-            const parsed = JSON.parse(rawFont);
-            const font = parsed?.state?.fontFamily || parsed?.fontFamily;
-            if (font && ["inter-tight", "geist", "space-grotesk"].includes(font)) {
-              document.documentElement.setAttribute("data-font", font);
-            } else {
-              document.documentElement.setAttribute("data-font", "inter-tight");
-            }
-          } else {
-            document.documentElement.setAttribute("data-font", "inter-tight");
-          }
+          // 字体由主题配置（theme_settings.fontFamily）决定，首屏先用默认字体，配置加载后覆盖。
+          document.documentElement.setAttribute("data-font", "space-grotesk");
         } catch {
-          document.documentElement.setAttribute("data-font", "inter-tight");
+          document.documentElement.setAttribute("data-font", "space-grotesk");
         }
       })();
     </script>

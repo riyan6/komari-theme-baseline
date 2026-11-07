@@ -9,6 +9,16 @@ interface StatusHeroProps {
   speedDown: number // bytes/sec
   trafficUp: number // bytes
   trafficDown: number // bytes
+  monthlyCost: number // CNY / month
+  yearlyCost: number // CNY / year
+}
+
+const formatCny = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) return '¥0.00'
+  return `¥${value.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 }
 
 export const StatusHero: React.FC<StatusHeroProps> = ({
@@ -18,6 +28,8 @@ export const StatusHero: React.FC<StatusHeroProps> = ({
   speedDown,
   trafficUp,
   trafficDown,
+  monthlyCost,
+  yearlyCost,
 }) => {
   const { t } = useTranslation()
   const totalSpeed = speedUp + speedDown
@@ -47,32 +59,47 @@ export const StatusHero: React.FC<StatusHeroProps> = ({
         </div>
       </div>
 
-      {/* Right: Stacked Total speed on top, 1px horizontal line, Total traffic on bottom */}
-      <div className="md:col-span-6 lg:col-span-6 flex flex-col justify-between border-t md:border-t-0 md:border-l border-black dark:border-[#333333] md:pl-8 pt-6 md:pt-0 mt-6 md:mt-0">
-        {/* Total speed */}
-        <div className="flex-1 flex flex-col justify-center pb-4">
-          <div className="label-swiss">{t('status.total_speed')}</div>
-          <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
-            {formatCompactSpeed(totalSpeed)}
+      {/* Right: network speed / traffic / monthly cost / yearly cost */}
+      <div className="md:col-span-6 lg:col-span-6 border-t md:border-t-0 md:border-l border-black dark:border-[#333333] md:pl-8 pt-6 md:pt-0 mt-6 md:mt-0">
+        <div className="grid h-full grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
+          {/* Network speed */}
+          <div className="flex flex-col justify-center">
+            <div className="label-swiss">{t('network_speed')}</div>
+            <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
+              {formatCompactSpeed(totalSpeed)}
+            </div>
+            <div className="mt-1.5 flex items-center gap-3 type-control text-[#6B6B6B] dark:text-[#8C8C8C] tabular-nums whitespace-nowrap">
+              <span>↓ {formatCompactSpeed(speedDown)}</span>
+              <span>↑ {formatCompactSpeed(speedUp)}</span>
+            </div>
           </div>
-          <div className="mt-1.5 flex items-center gap-3 type-control text-[#6B6B6B] dark:text-[#8C8C8C] tabular-nums whitespace-nowrap">
-            <span>↓ {formatCompactSpeed(speedDown)}</span>
-            <span>↑ {formatCompactSpeed(speedUp)}</span>
-          </div>
-        </div>
 
-        {/* 1px Horizontal Separator */}
-        <div className="w-full h-[1px] bg-black/20 dark:bg-white/20" />
-
-        {/* Total traffic */}
-        <div className="flex-1 flex flex-col justify-center pt-4">
-          <div className="label-swiss">{t('status.total_traffic')}</div>
-          <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
-            {formatCompactBytes(totalTraffic)}
+          {/* Traffic overview */}
+          <div className="flex flex-col justify-center">
+            <div className="label-swiss">{t('traffic_overview')}</div>
+            <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
+              {formatCompactBytes(totalTraffic)}
+            </div>
+            <div className="mt-1.5 flex items-center gap-3 type-control text-[#6B6B6B] dark:text-[#8C8C8C] tabular-nums whitespace-nowrap">
+              <span>↓ {formatCompactBytes(trafficDown)}</span>
+              <span>↑ {formatCompactBytes(trafficUp)}</span>
+            </div>
           </div>
-          <div className="mt-1.5 flex items-center gap-3 type-control text-[#6B6B6B] dark:text-[#8C8C8C] tabular-nums whitespace-nowrap">
-            <span>↓ {formatCompactBytes(trafficDown)}</span>
-            <span>↑ {formatCompactBytes(trafficUp)}</span>
+
+          {/* Monthly cost */}
+          <div className="flex flex-col justify-center">
+            <div className="label-swiss">{t('status.monthly_cost')}</div>
+            <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
+              {formatCny(monthlyCost)}
+            </div>
+          </div>
+
+          {/* Yearly cost */}
+          <div className="flex flex-col justify-center">
+            <div className="label-swiss">{t('status.yearly_cost')}</div>
+            <div className="sub-number mt-1.5 text-black dark:text-[#F2F2F2] tabular-nums whitespace-nowrap">
+              {formatCny(yearlyCost)}
+            </div>
           </div>
         </div>
       </div>

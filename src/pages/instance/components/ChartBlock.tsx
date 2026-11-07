@@ -52,9 +52,10 @@ const latestValueText = (view: ChartView) => {
     const row = view.rows[rowIndex];
     for (const item of view.series) {
       const value = row[item.dataKey];
-      if (typeof value === "number" && Number.isFinite(value)) {
-        return formatValue(value, item.kind);
-      }
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      // 延迟指标的负值是后端写入的丢包标记，不是真实延迟，最新值不能取它。
+      if (item.kind === "milliseconds" && value < 0) continue;
+      return formatValue(value, item.kind);
     }
   }
   return "—";
@@ -209,7 +210,11 @@ type LatencyTarget = {
 const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-const buildLatencyTargets = (view: ChartView): LatencyTarget[] => {
+const buildLatencyTargets = (
+  view: ChartView,
+  pingStatsMap?: ReadonlyMap<string, PingMetricStat>,
+  uuid?: string,
+): LatencyTarget[] => {
   const rows = view.rows;
   if (rows.length === 0) return [];
   const times = rows.map((row) => new Date(String(row.time)).getTime());
@@ -218,14 +223,26 @@ const buildLatencyTargets = (view: ChartView): LatencyTarget[] => {
   const span = end - start;
 
   return view.series.map((series, index) => {
-    const allValues = rows.map((row) => row[series.dataKey]);
-    const validValues = allValues.filter(isNumber);
-    const totalRows = rows.length;
-    const avg =
+    const taskId = pingTaskId(series.tags);
+    const stat =
+      uuid && taskId ? pingStatsMap?.get(pingMetricStatKey(uuid, taskId)) : undefined;
+
+    /*
+      只统计「本目标自己的采样」：图上所有 ping 目标共用一行集合，其它目标的时间戳在这一列是 null，
+      不能算作本目标的丢包（之前按总行数算会得到 65.5% 这种假丢包）。
+      延迟为负值是后端写入的丢包标记（internal/metricstore/ping_records.go），不计入有效延迟。
+    */
+    const ownValues = rows
+      .map((row) => row[series.dataKey])
+      .filter(isNumber);
+    const validValues = ownValues.filter((value) => value >= 0);
+    const totalSamples = ownValues.length;
+
+    const fallbackAvg =
       validValues.length > 0
         ? validValues.reduce((sum, value) => sum + value, 0) / validValues.length
         : null;
-    const jitter =
+    const fallbackJitter =
       validValues.length > 1
         ? validValues
             .slice(1)
@@ -236,35 +253,54 @@ const buildLatencyTargets = (view: ChartView): LatencyTarget[] => {
             ) /
           (validValues.length - 1)
         : null;
-    const loss =
-      totalRows > 0 ? ((totalRows - validValues.length) / totalRows) * 100 : null;
-    const last =
+    const fallbackLoss =
+      totalSamples > 0
+        ? ((totalSamples - validValues.length) / totalSamples) * 100
+        : null;
+    const fallbackLast =
       validValues.length > 0 ? validValues[validValues.length - 1] : null;
+
+    // 均值 / 丢包 / 最新值优先用后端 getPingMetricStats 的权威统计，避免从降采样行反推。
+    const statAvg = stat?.avg;
+    const statLoss = stat?.loss;
+    const statLatest = stat?.latest;
+    const avg = isNumber(statAvg) ? statAvg : fallbackAvg;
+    const loss = typeof statLoss === "number" ? statLoss : fallbackLoss;
+    const last = isNumber(statLatest) ? statLatest : fallbackLast;
+    // 后端未提供 jitter，用本目标自身的有效采样（排除负值丢包标记）计算平均绝对差。
+    const jitter = fallbackJitter;
 
     const buckets: LatencyBucket[] = Array.from({ length: 60 }, (_, bucketIndex) => {
       const bucketStart = start + (span * bucketIndex) / 60;
       const bucketEnd = start + (span * (bucketIndex + 1)) / 60;
-      const bucketRows = rows.filter((_row, rowIndex) => {
+      const bucketSamples: number[] = [];
+      const bucketValid: number[] = [];
+      let bucketLost = 0;
+      rows.forEach((row, rowIndex) => {
         const time = times[rowIndex];
-        return bucketIndex === 59
-          ? time >= bucketStart && time <= end
-          : time >= bucketStart && time < bucketEnd;
+        const inBucket =
+          bucketIndex === 59
+            ? time >= bucketStart && time <= end
+            : time >= bucketStart && time < bucketEnd;
+        if (!inBucket) return;
+        const value = row[series.dataKey];
+        if (!isNumber(value)) return;
+        bucketSamples.push(value);
+        if (value >= 0) bucketValid.push(value);
+        else bucketLost += 1;
       });
-      const bucketValues = bucketRows
-        .map((row) => row[series.dataKey])
-        .filter(isNumber);
       const bucketLoss =
-        bucketRows.length > 0
-          ? ((bucketRows.length - bucketValues.length) / bucketRows.length) * 100
+        bucketSamples.length > 0
+          ? (bucketLost / bucketSamples.length) * 100
           : null;
       const bucketAvg =
-        bucketValues.length > 0
-          ? bucketValues.reduce((sum, value) => sum + value, 0) /
-            bucketValues.length
+        bucketValid.length > 0
+          ? bucketValid.reduce((sum, value) => sum + value, 0) /
+            bucketValid.length
           : null;
 
       let state: LatencyBucket["state"] = "empty";
-      if (bucketRows.length > 0 && bucketValues.length > 0) {
+      if (bucketSamples.length > 0 && bucketValid.length > 0) {
         if (bucketLoss === 0) state = "solid";
         else if (bucketLoss !== null && bucketLoss < 50) state = "hollow";
       }
@@ -305,16 +341,23 @@ const LATENCY_GRID_CLASS =
 const LatencyTargetTable = ({
   view,
   displayRangeHours,
+  pingStatsMap,
+  uuid,
 }: {
   view: ChartView;
   displayRangeHours?: number;
+  pingStatsMap?: ReadonlyMap<string, PingMetricStat>;
+  uuid?: string;
 }) => {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState<{
     targetIndex: number;
     bucketIndex: number;
   } | null>(null);
-  const targets = useMemo(() => buildLatencyTargets(view), [view]);
+  const targets = useMemo(
+    () => buildLatencyTargets(view, pingStatsMap, uuid),
+    [view, pingStatsMap, uuid],
+  );
   if (targets.length === 0) return null;
 
   return (
@@ -607,7 +650,12 @@ const ChartBlock = ({
 
       {isPing && view.series.length > 0 && (
         <div className="mt-4 border-t border-[color:var(--km-instance-hairline-soft)] pt-4">
-          <LatencyTargetTable view={view} displayRangeHours={displayRangeHours} />
+          <LatencyTargetTable
+            view={view}
+            displayRangeHours={displayRangeHours}
+            pingStatsMap={pingStatsMap}
+            uuid={uuid}
+          />
         </div>
       )}
     </section>

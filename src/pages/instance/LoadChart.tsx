@@ -7,7 +7,6 @@ import { PING_LATENCY_METRIC } from "@/utils/metricSeries";
 import ChartBlock from "./components/ChartBlock";
 import TimeRangeTabs from "./components/TimeRangeTabs";
 import { hasRealtimeSource } from "./loadChart/catalog";
-import CustomRangePanel from "./loadChart/CustomRangePanel";
 import { buildChartView } from "./loadChart/series";
 import type { DashboardChart } from "./loadChart/types";
 import { useMetricCatalog } from "./loadChart/useMetricCatalog";
@@ -105,15 +104,6 @@ const LoadChart = ({
         views={timeRange.timeViews}
         value={timeRange.selectedView.key}
         onChange={timeRange.setViewKey}
-      />
-
-      <CustomRangePanel
-        open={timeRange.isCustomRange}
-        draft={timeRange.customDraftRange}
-        error={timeRange.customRangeError}
-        onDraftChange={timeRange.updateCustomDraft}
-        onSelectRecentRange={timeRange.selectRecentRange}
-        onApply={timeRange.applyCustomRange}
       />
 
       <div className="mt-4 border-t border-[color:var(--km-instance-hairline)]" />

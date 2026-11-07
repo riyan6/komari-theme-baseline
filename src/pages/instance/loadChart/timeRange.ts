@@ -10,10 +10,10 @@ export const buildTimeViews = (
     { key: "real-time", label: t("common.real_time") },
     { key: "10m", label: t("chart.minutes", { count: 10 }), hours: 10 / 60 },
     { key: "1h", label: t("chart.hours", { count: 1 }), hours: 1 },
+    { key: "6h", label: t("chart.hours", { count: 6 }), hours: 6 },
     { key: "1d", label: t("chart.days", { count: 1 }), hours: 24 },
-    { key: "7d", label: t("chart.days", { count: 7 }), hours: 7 * 24 },
-    { key: "15d", label: t("chart.days", { count: 15 }), hours: 15 * 24 },
-    { key: "custom", label: t("chart.customRange") },
+    { key: "2d", label: t("chart.days", { count: 2 }), hours: 2 * 24 },
+    { key: "3d", label: t("chart.days", { count: 3 }), hours: 3 * 24 },
   ];
 };
 

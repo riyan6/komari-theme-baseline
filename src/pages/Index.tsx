@@ -1,21 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable'
 
 import { StatusHero } from '@/components/status/StatusHero'
 import {
@@ -24,13 +8,10 @@ import {
   type StatusSortKey,
 } from '@/components/status/StatusToolbar'
 import { ServerTableView } from '@/components/status/ServerTableView'
-import { ServerCardView } from '@/components/status/ServerCardView'
 import { useNoiseProbe } from '@/hooks/useNoiseProbe'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { useNoisePreferences } from '@/lib/noise-store'
-
-const pointerOptions = { activationConstraint: { distance: 5 } }
-const keyboardOptions = { coordinateGetter: sortableKeyboardCoordinates }
+import { useCnyRates } from '@/hooks/useExchangeRates'
+import { toCnyAmount } from '@/utils/currency'
 
 const Index: React.FC = () => {
   const { t } = useTranslation()
@@ -38,30 +19,22 @@ const Index: React.FC = () => {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<StatusSortKey>('default')
   const [sortDir, setSortDir] = useState<StatusSortDir>('desc')
-  const viewMode = useNoisePreferences((state) => state.statusViewMode)
-  const [customOrder, setCustomOrder] = useLocalStorage<string[]>(
-    'statusNodeOrder',
-    []
-  )
   const [selectedGroup, setSelectedGroup] = useLocalStorage<string>(
     'statusSelectedGroup',
     'all'
   )
-  const reducedMotion = useReducedMotion()
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, pointerOptions),
-    useSensor(KeyboardSensor, keyboardOptions)
-  )
+  const cnyRates = useCnyRates()
 
   // Calculate accurate fleet stats directly from bytes
-  const { onlineCount, speedUp, speedDown, trafficUp, trafficDown } =
+  const { onlineCount, speedUp, speedDown, trafficUp, trafficDown, monthlyCost, yearlyCost } =
     useMemo(() => {
       let online = 0
       let up = 0
       let down = 0
       let tUp = 0
       let tDown = 0
+      let monthly = 0
+      let yearly = 0
 
       for (const node of nodes) {
         if (node.online) {
@@ -71,6 +44,13 @@ const Index: React.FC = () => {
         }
         tUp += node.totalUp
         tDown += node.totalDown
+
+        // 按账单周期把价格折算成月 / 年支出（billingCycle 单位为天），并统一换算成人民币
+        const priceCny = toCnyAmount(node.price, node.currency, cnyRates)
+        if (priceCny > 0 && node.billingCycle > 0) {
+          monthly += priceCny * (30 / node.billingCycle)
+          yearly += priceCny * (365 / node.billingCycle)
+        }
       }
 
       return {
@@ -79,8 +59,10 @@ const Index: React.FC = () => {
         speedDown: down,
         trafficUp: tUp,
         trafficDown: tDown,
+        monthlyCost: monthly,
+        yearlyCost: yearly,
       }
-    }, [nodes])
+    }, [nodes, cnyRates])
 
   // Extract distinct groups and group count mapping
   const { groups, groupCounts } = useMemo(() => {
@@ -118,24 +100,12 @@ const Index: React.FC = () => {
       return searchStr.includes(q)
     })
 
-    // Custom order mapping or multi-key sort
+    // Multi-key sort
     if (sortKey === 'default') {
-      if (customOrder.length > 0) {
-        result = [...result].sort((a, b) => {
-          const ai = customOrder.indexOf(a.id)
-          const bi = customOrder.indexOf(b.id)
-          if (ai !== -1 && bi !== -1) return ai - bi
-          if (ai !== -1) return -1
-          if (bi !== -1) return 1
-          if (a.online !== b.online) return a.online ? -1 : 1
-          return 0
-        })
-      } else {
-        result = [...result].sort((a, b) => {
-          if (a.online !== b.online) return a.online ? -1 : 1
-          return 0
-        })
-      }
+      result = [...result].sort((a, b) => {
+        if (a.online !== b.online) return a.online ? -1 : 1
+        return 0
+      })
     } else {
       const mul = sortDir === 'asc' ? 1 : -1
       result = [...result].sort((a, b) => {
@@ -200,7 +170,7 @@ const Index: React.FC = () => {
     }
 
     return result
-  }, [nodes, query, selectedGroup, sortKey, sortDir, customOrder])
+  }, [nodes, query, selectedGroup, sortKey, sortDir])
 
   // Click column header: desc (↓) -> asc (↑) -> default
   const handleToggleSort = (key: StatusSortKey) => {
@@ -215,21 +185,6 @@ const Index: React.FC = () => {
     }
   }
 
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return
-    const currentIds = processedNodes.map((n) => n.id)
-    const oldIndex = currentIds.indexOf(String(active.id))
-    const newIndex = currentIds.indexOf(String(over.id))
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const reordered = arrayMove(currentIds, oldIndex, newIndex)
-      setCustomOrder(reordered)
-    }
-  }
-
-  const motionTransition = reducedMotion
-    ? { duration: 0 }
-    : { duration: 0.12, ease: 'easeOut' as const }
-
   return (
     <div className="w-full">
       {/* Hero Stats */}
@@ -240,6 +195,8 @@ const Index: React.FC = () => {
         speedDown={speedDown}
         trafficUp={trafficUp}
         trafficDown={trafficDown}
+        monthlyCost={monthlyCost}
+        yearlyCost={yearlyCost}
       />
 
       {/* Group Filter & Collapsible Search */}
@@ -287,35 +244,12 @@ const Index: React.FC = () => {
           )}
         </div>
       ) : (
-        <motion.div
-          key={viewMode}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={motionTransition}
-          className="w-full"
-        >
-          {viewMode === 'table' ? (
-            <ServerTableView
-              nodes={processedNodes}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onToggleSort={handleToggleSort}
-            />
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={onDragEnd}
-            >
-              <SortableContext
-                items={processedNodes.map((n) => n.id)}
-                strategy={rectSortingStrategy}
-              >
-                <ServerCardView nodes={processedNodes} />
-              </SortableContext>
-            </DndContext>
-          )}
-        </motion.div>
+        <ServerTableView
+          nodes={processedNodes}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onToggleSort={handleToggleSort}
+        />
       )}
     </div>
   )

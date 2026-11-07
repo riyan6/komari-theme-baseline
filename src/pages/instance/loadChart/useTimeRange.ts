@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { CUSTOM_RANGE_DEFAULT_DAYS } from "./constants";
 import { buildRecentRange, buildTimeViews, toQueryRange } from "./timeRange";
 import type { CustomTimeRange, MetricRangeParams } from "./types";
 
-/** 时间范围：预设视图（实时 / 10 分钟 / … / 自定义）与自定义范围的草稿、校验和查询参数 */
+const TIME_RANGE_STORAGE_KEY = "komari-instance-time-range";
+
+/** 时间范围：预设视图（实时 / 10 分钟 / 1 小时 / 1 天 / 2 天 / 3 天）与本地持久化 */
 export function useTimeRange(
   maxMetricRetentionDays: number,
   onRealtimeActiveChange?: (active: boolean) => void,
@@ -14,7 +17,10 @@ export function useTimeRange(
     () => buildTimeViews(t, maxMetricRetentionDays),
     [t, maxMetricRetentionDays],
   );
-  const [viewKey, setViewKey] = useState("real-time");
+  const [viewKey, setViewKey] = useLocalStorage<string>(
+    TIME_RANGE_STORAGE_KEY,
+    "real-time",
+  );
   const selectedView = timeViews.find((view) => view.key === viewKey) ?? timeViews[0];
   const isRealtime = selectedView.key === "real-time";
   const isCustomRange = selectedView.key === "custom";
@@ -35,7 +41,7 @@ export function useTimeRange(
     if (!timeViews.some((view) => view.key === viewKey)) {
       setViewKey(timeViews[0]?.key ?? "real-time");
     }
-  }, [timeViews, viewKey]);
+  }, [setViewKey, timeViews, viewKey]);
 
   const customQuery = useMemo(
     () => toQueryRange(customQueryRange),

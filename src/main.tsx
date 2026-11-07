@@ -1,16 +1,15 @@
 import React, { StrictMode, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter-tight";
+import "@fontsource-variable/space-grotesk";
 import "@fontsource/noto-sans-sc/400.css";
 import "@fontsource/noto-sans-sc/500.css";
 import "@fontsource/noto-sans-sc/700.css";
 
-// Preload persisted variable font before mount
+// Preload on-demand fonts before mount (inter-tight / space-grotesk are static; geist is lazy)
 const earlyFont = typeof document !== "undefined" ? document.documentElement.getAttribute("data-font") : null;
 if (earlyFont === "geist") {
   void import("@fontsource-variable/geist");
-} else if (earlyFont === "space-grotesk") {
-  void import("@fontsource-variable/space-grotesk");
 }
 import "./global.css";
 import "./noise.css";

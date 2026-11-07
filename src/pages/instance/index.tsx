@@ -216,7 +216,7 @@ export default function InstancePage() {
             <button
               type="button"
               onClick={copyUuid}
-              className="mt-3 block max-w-full break-all text-left font-sans text-[11px] font-medium leading-relaxed text-[color:var(--km-instance-muted)] transition-colors hover:text-black dark:hover:text-[#F2F2F2]"
+              className="type-control mt-3 block max-w-full cursor-pointer break-all text-left text-[color:var(--km-instance-muted)] transition-colors hover:text-black dark:hover:text-[#F2F2F2]"
             >
               {uuid}
             </button>

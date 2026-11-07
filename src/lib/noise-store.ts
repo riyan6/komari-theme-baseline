@@ -27,14 +27,12 @@ interface Preferences {
   theme: 'light' | 'dark'
   lang: Language
   view: 'grid' | 'table'
-  statusViewMode: 'table' | 'card'
   cardDensity: CardDensity
   order: string[]
   orderMode: 'priority' | 'custom'
   range: '1m' | '15m' | '1h'
   sort: { key: SortKey; direction: 'asc' | 'desc' }
   setView: (view: 'grid' | 'table') => void
-  setStatusViewMode: (mode: 'table' | 'card') => void
   setCardDensity: (cardDensity: CardDensity) => void
   setTheme: (theme: 'light' | 'dark') => void
   setLang: (lang: Language) => void
@@ -69,32 +67,18 @@ const getInitialTheme = (): 'light' | 'dark' => {
   return 'dark'
 }
 
-const getInitialStatusViewMode = (): 'table' | 'card' => {
-  if (typeof window !== 'undefined') {
-    try {
-      const legacy = window.localStorage.getItem('statusViewMode')
-      if (legacy === 'card' || legacy === '"card"') return 'card'
-    } catch {
-      // ignore
-    }
-  }
-  return 'table'
-}
-
 export const useNoisePreferences = create<Preferences>()(
   persist(
     (set) => ({
       theme: getInitialTheme(),
       lang: 'zh',
       view: 'grid',
-      statusViewMode: getInitialStatusViewMode(),
       cardDensity: 'compact',
       order: [],
       orderMode: 'priority',
       range: '1m',
       sort: { key: 'priority', direction: 'desc' },
       setView: (view) => set({ view }),
-      setStatusViewMode: (statusViewMode) => set({ statusViewMode }),
       setCardDensity: (cardDensity) => set({ cardDensity }),
       setTheme: (theme) => {
         syncThemeToDom(theme)

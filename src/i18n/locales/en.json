@@ -1685,6 +1685,8 @@
     "waiting_nodes": "Waiting for nodes...",
     "total_speed": "Total speed",
     "total_traffic": "Total traffic",
+    "monthly_cost": "Monthly Cost",
+    "yearly_cost": "Yearly Cost",
     "search_nodes": "Search nodes",
     "search_placeholder": "Name / Region / OS / IP",
     "sort": "Sort",

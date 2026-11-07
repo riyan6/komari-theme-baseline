@@ -1556,6 +1556,7 @@
     "group": "分组",
     "group_all": "全部",
     "live": "实时",
+    "monthly_cost": "月支出",
     "no_match": "未找到匹配的服务器",
     "no_nodes": "暂无服务器节点",
     "nodes_count": "台服务器",
@@ -1599,7 +1600,8 @@
     "view_card": "卡片",
     "view_table": "表格",
     "waiting_nodes": "等待节点连接...",
-    "waiting_telemetry": "正在等待服务器节点..."
+    "waiting_telemetry": "正在等待服务器节点...",
+    "yearly_cost": "年支出"
   },
   "status_settings": "状态显示设置",
   "system": {

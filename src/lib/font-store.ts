@@ -1,12 +1,8 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-
 export type FontFamilyKey = 'inter-tight' | 'geist' | 'space-grotesk'
 
 export interface FontOption {
   key: FontFamilyKey
   name: string
-  shortName: string
   fontFamily: string
 }
 
@@ -14,73 +10,50 @@ export const FONT_OPTIONS: FontOption[] = [
   {
     key: 'inter-tight',
     name: 'Inter Tight',
-    shortName: 'IT',
     fontFamily: '"Inter Tight Variable"',
   },
   {
     key: 'geist',
     name: 'Geist',
-    shortName: 'GE',
     fontFamily: '"Geist Variable"',
   },
   {
     key: 'space-grotesk',
     name: 'Space Grotesk',
-    shortName: 'SG',
     fontFamily: '"Space Grotesk Variable"',
   },
 ]
 
-const loadedFonts = new Set<string>(['inter-tight'])
+/** 默认字体（与 komari-theme.json 中 fontFamily 的默认值保持一致） */
+export const DEFAULT_FONT_FAMILY: FontFamilyKey = 'space-grotesk'
+
+// inter-tight / space-grotesk 在 main.tsx 中静态引入，只有 geist 按需加载。
+const loadedFonts = new Set<string>(['inter-tight', 'space-grotesk'])
 
 export const loadFontOnDemand = async (key: FontFamilyKey) => {
   if (loadedFonts.has(key)) return
   if (key === 'geist') {
     await import('@fontsource-variable/geist')
     loadedFonts.add('geist')
-  } else if (key === 'space-grotesk') {
-    await import('@fontsource-variable/space-grotesk')
-    loadedFonts.add('space-grotesk')
   }
 }
 
-interface FontStore {
-  fontFamily: FontFamilyKey
-  setFontFamily: (font: FontFamilyKey) => void
-  cycleFont: () => void
-}
-
-const syncFontToDom = (font: FontFamilyKey) => {
-  if (typeof document !== 'undefined') {
-    document.documentElement.setAttribute('data-font', font)
-  }
-  void loadFontOnDemand(font)
-}
-
-export const useFontStore = create<FontStore>()(
-  persist(
-    (set, get) => ({
-      fontFamily: 'inter-tight',
-      setFontFamily: (font) => {
-        syncFontToDom(font)
-        set({ fontFamily: font })
-      },
-      cycleFont: () => {
-        const current = get().fontFamily
-        const currentIndex = FONT_OPTIONS.findIndex((f) => f.key === current)
-        const nextIndex = (currentIndex + 1) % FONT_OPTIONS.length
-        const nextFont = FONT_OPTIONS[nextIndex].key
-        syncFontToDom(nextFont)
-        set({ fontFamily: nextFont })
-      },
-    }),
-    {
-      name: 'font-preference',
-      onRehydrateStorage: () => (state) => {
-        if (state?.fontFamily) {
-          syncFontToDom(state.fontFamily)
-        }
-      },
-    }
+/** 把配置里的字体名（或 key）解析成内部字体 key，未知值回退到默认字体。 */
+export const resolveFontFamilyKey = (value: unknown): FontFamilyKey => {
+  if (typeof value !== 'string') return DEFAULT_FONT_FAMILY
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return DEFAULT_FONT_FAMILY
+  const match = FONT_OPTIONS.find(
+    (option) =>
+      option.key === normalized || option.name.toLowerCase() === normalized,
   )
-)
+  return match?.key ?? DEFAULT_FONT_FAMILY
+}
+
+/** 应用字体：写入 data-font（noise.css 据此切换 --font-current-sans）并按需加载字体文件。 */
+export const applyFontFamily = (key: FontFamilyKey) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-font', key)
+  }
+  void loadFontOnDemand(key)
+}

@@ -13,7 +13,7 @@ const TimeRangeTabs = ({ views, value, onChange }: TimeRangeTabsProps) => {
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--km-instance-muted)]">
+      <span className="label-swiss">
         {t("common.timeRange")}
       </span>
       <div className="-mx-1 flex flex-wrap items-center gap-x-5 gap-y-2 px-1">
@@ -24,10 +24,10 @@ const TimeRangeTabs = ({ views, value, onChange }: TimeRangeTabsProps) => {
               key={view.key}
               type="button"
               onClick={() => onChange(view.key)}
-              className={`relative pb-1 text-[14px] leading-none transition-colors ${
+              className={`relative cursor-pointer pb-1 font-sans text-[length:var(--font-size-control)] leading-none tabular-nums transition-colors ${
                 selected
                   ? "font-semibold text-black dark:text-[#F2F2F2]"
-                  : "font-normal text-[color:var(--km-instance-muted)] hover:text-black dark:hover:text-[#F2F2F2]"
+                  : "font-medium text-[color:var(--km-instance-muted)] hover:text-black dark:hover:text-[#F2F2F2]"
               }`}
             >
               {view.label}
