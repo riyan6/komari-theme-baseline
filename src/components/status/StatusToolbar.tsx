@@ -57,21 +57,24 @@ export const StatusToolbar: React.FC<StatusToolbarProps> = ({
 
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-black pb-4 dark:border-[#333333]">
-      {/* Left: Group Pills */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Left: Group Tabs (weight 600 + 2px black underline) */}
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
         {groups.length > 0 && (
-          <span className="label-swiss mr-1">{t('status.group')}:</span>
+          <span className="label-swiss mr-1 pb-1.5 leading-none">{t('status.group')}:</span>
         )}
         <button
           type="button"
           onClick={() => setSelectedGroup('all')}
-          className={`inline-flex h-[34px] items-center px-3.5 type-label transition-colors cursor-pointer border ${
+          className={`relative cursor-pointer pb-1.5 type-label leading-none transition-colors ${
             selectedGroup === 'all'
-              ? 'border-black bg-black text-white dark:border-[#F2F2F2] dark:bg-[#F2F2F2] dark:text-black'
-              : 'border-transparent text-[#6B6B6B] hover:text-black hover:border-black/30 dark:text-[#8C8C8C] dark:hover:text-white dark:hover:border-white/30'
+              ? 'font-semibold text-black dark:text-[#F2F2F2]'
+              : 'font-medium text-[#6B6B6B] hover:text-black dark:text-[#8C8C8C] dark:hover:text-[#F2F2F2]'
           }`}
         >
           {t('status.group_all')} ({totalCount})
+          {selectedGroup === 'all' && (
+            <span className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-black dark:bg-[#F2F2F2]" />
+          )}
         </button>
         {groups.map((group) => {
           const count = groupCounts[group] || 0
@@ -81,13 +84,16 @@ export const StatusToolbar: React.FC<StatusToolbarProps> = ({
               key={group}
               type="button"
               onClick={() => setSelectedGroup(group)}
-              className={`inline-flex h-[34px] items-center px-3.5 type-label transition-colors cursor-pointer border ${
+              className={`relative cursor-pointer pb-1.5 type-label leading-none transition-colors ${
                 isSelected
-                  ? 'border-black bg-black text-white dark:border-[#F2F2F2] dark:bg-[#F2F2F2] dark:text-black'
-                  : 'border-transparent text-[#6B6B6B] hover:text-black hover:border-black/30 dark:text-[#8C8C8C] dark:hover:text-white dark:hover:border-white/30'
+                  ? 'font-semibold text-black dark:text-[#F2F2F2]'
+                  : 'font-medium text-[#6B6B6B] hover:text-black dark:text-[#8C8C8C] dark:hover:text-[#F2F2F2]'
               }`}
             >
               {group} ({count})
+              {isSelected && (
+                <span className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-black dark:bg-[#F2F2F2]" />
+              )}
             </button>
           )
         })}

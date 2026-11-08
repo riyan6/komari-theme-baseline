@@ -7,7 +7,12 @@ import { motion, useReducedMotion } from "motion/react";
 import { useViewTransitionActive } from "@/lib/viewTransitionState";
 import { RevealBoundary } from "@/components/motion/reveal";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
-import { applyFontFamily, resolveFontFamilyKey } from "@/lib/font-store";
+import {
+  DEFAULT_BODY_FONT,
+  DEFAULT_DISPLAY_FONT,
+  applyThemeFonts,
+  resolveFontFamilyKey,
+} from "@/lib/font-store";
 
 const IndexLayout = () => {
   const InnerLayout = () => {
@@ -16,12 +21,19 @@ const IndexLayout = () => {
     const viewTransitionActive = useViewTransitionActive();
     const reducedMotion = useReducedMotion();
     const routeSection = location.pathname.split("/").filter(Boolean)[0] ?? "home";
-    const configuredFont = publicInfo?.theme_settings?.fontFamily;
+    const configuredDisplayFont =
+      publicInfo?.theme_settings?.displayFont ??
+      publicInfo?.theme_settings?.fontFamily;
+    const configuredBodyFont = publicInfo?.theme_settings?.bodyFont;
 
-    // 字体来自主题配置 theme_settings.fontFamily，未配置时回退默认字体（Space Grotesk）。
+    // 字体来自主题配置 theme_settings.displayFont / theme_settings.bodyFont，
+    // 未配置时分别回退默认字体（Space Grotesk / Inter Tight）。
     useEffect(() => {
-      applyFontFamily(resolveFontFamilyKey(configuredFont));
-    }, [configuredFont]);
+      applyThemeFonts(
+        resolveFontFamilyKey(configuredDisplayFont, DEFAULT_DISPLAY_FONT),
+        resolveFontFamilyKey(configuredBodyFont, DEFAULT_BODY_FONT),
+      );
+    }, [configuredDisplayFont, configuredBodyFont]);
 
     const transition = reducedMotion
       ? { duration: 0 }

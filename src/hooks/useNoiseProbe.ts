@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNodeList } from '@/contexts/NodeListContext'
 import { useLiveData } from '@/contexts/LiveDataContext'
 import { summarize } from '@/lib/noise-telemetry'
-import { getDaysLeft, parseValidTimestampMs } from '@/utils/statusFormat'
+import { getDaysLeft, normalizeRegionCode, parseValidTimestampMs } from '@/utils/statusFormat'
 import type { ProbeNode, Sample } from '@/lib/noise-types'
 
 // Global in-memory rolling history map across re-renders
@@ -144,12 +144,14 @@ export function useNoiseProbe() {
         parseValidTimestampMs(live?.updated_at) ??
         parseValidTimestampMs(raw.updated_at)
 
+      const regionCode = normalizeRegionCode(raw.region)
+
       return {
         id: raw.uuid,
         uuid: raw.uuid,
         name: raw.name,
-        region: raw.region || '',
-        city: raw.group || raw.region || '',
+        region: regionCode,
+        city: raw.group || regionCode,
         provider: raw.virtualization || raw.tags || 'VPS',
         group: raw.group || '',
         tags: raw.tags || '',

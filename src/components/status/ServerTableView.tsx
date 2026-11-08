@@ -5,7 +5,9 @@ import {
   formatBillingInfo,
   formatCompactBytes,
   formatCompactSpeed,
+  formatDateTimeWithTz,
   formatOfflineDuration,
+  formatRegionCode,
   formatUptimeCompact,
 } from '@/utils/statusFormat'
 import type { ProbeNode } from '@/lib/noise-types'
@@ -24,9 +26,8 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
   sortDir,
   onToggleSort,
 }) => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
-  const isZh = i18n.language?.toLowerCase().startsWith('zh')
 
   const renderSortIndicator = (key: StatusSortKey) => {
     if (sortKey !== key) return null
@@ -57,7 +58,7 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
           <col className="w-[132px]" />
           <col className="w-[128px]" />
           <col className="w-[132px]" />
-          <col className="w-[112px]" />
+          <col className="w-[136px]" />
         </colgroup>
         <thead>
           <tr className="border-b border-black type-table-head dark:border-[#333333]">
@@ -186,10 +187,10 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
                     {node.name}
                   </div>
                   <div
-                    className="mt-0.5 flex items-center gap-1.5 type-meta uppercase tracking-wider text-[#6B6B6B] dark:text-[#8C8C8C] whitespace-nowrap"
+                    className="mt-0.5 flex items-center gap-1.5 type-meta tracking-wider text-[#6B6B6B] dark:text-[#8C8C8C] whitespace-nowrap"
                     title={
                       !node.online && node.lastSeen
-                        ? new Date(node.lastSeen).toLocaleString()
+                        ? formatDateTimeWithTz(node.lastSeen)
                         : undefined
                     }
                   >
@@ -198,7 +199,7 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
                         node.online ? 'status-square-online' : 'status-square-offline'
                       }
                     />
-                    <span className={node.online ? '' : 'text-[#E5001C]'}>
+                    <span className={node.online ? 'uppercase' : 'text-[#E5001C]'}>
                       {node.online
                         ? t('status.online')
                         : formatOfflineDuration(node.lastSeen, t)}
@@ -209,7 +210,7 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
                 {/* Region: Same font style as node name */}
                 <td className="h-[62px] px-2.5 align-middle whitespace-nowrap uppercase">
                   <span className="node-name text-black dark:text-[#F2F2F2]">
-                    {node.region ? node.region.toUpperCase() : '—'}
+                    {formatRegionCode(node.region)}
                   </span>
                 </td>
 
@@ -231,7 +232,7 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
                   )}
                 </td>
 
-                {/* CPU: number right-aligned on top, 4px bar below */}
+                {/* CPU: number right-aligned on top (1 decimal place), 4px bar below */}
                 <td className="h-[62px] px-3.5 align-middle text-right">
                   {node.online ? (
                     <div className="flex flex-col items-stretch">
@@ -367,7 +368,7 @@ export const ServerTableView: React.FC<ServerTableViewProps> = ({
 
                 {/* Uptime */}
                 <td className="h-[62px] pl-3 pr-2 text-right align-middle table-value whitespace-nowrap text-black dark:text-[#F2F2F2]">
-                  {node.online ? formatUptimeCompact(node.uptime, isZh) : (
+                  {node.online ? formatUptimeCompact(node.uptime) : (
                     <span className="text-[#6B6B6B]">—</span>
                   )}
                 </td>

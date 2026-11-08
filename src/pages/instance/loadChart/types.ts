@@ -69,6 +69,7 @@ export type RenderSeries = {
   unit?: string;
   yAxisId?: "left" | "right";
   tags?: Record<string, string>;
+  samples?: Array<{ time: number; value: number | null }>;
 };
 
 export type BuiltChartData = {

@@ -1,9 +1,11 @@
 import { toMetricChartConfig } from "@/components/metricChartShared";
-import type { MetricSeries, PublicPingTask } from "@/types/metrics";
+import type { MetricPoint, MetricSeries, PublicPingTask } from "@/types/metrics";
 import {
+  PING_LOSS_METRIC,
   applyMetricEwma,
   comparePingTaskOrder,
   countMetricPoints,
+  isLoss,
   isPingMetric,
   metricChartBoundaryTicks,
   metricSeriesColor,
@@ -40,6 +42,19 @@ export const buildRowsFromMetricSeries = (
   const rows = new Map<string, Record<string, string | number | null>>();
   const renderSeries: RenderSeries[] = [];
 
+  const pingLossByTagKey = new Map<string, Map<string, MetricPoint>>();
+  metricSeries
+    .filter((series) => series.metric_key === PING_LOSS_METRIC)
+    .forEach((series) => {
+      const tagKey = metricTagsKey(metricTags(series));
+      const pointMap = pingLossByTagKey.get(tagKey) ?? new Map<string, MetricPoint>();
+      for (const point of series.points ?? []) {
+        const timestamp = new Date(point.time).toISOString();
+        pointMap.set(timestamp, point);
+      }
+      pingLossByTagKey.set(tagKey, pointMap);
+    });
+
   metricSeries
     .filter((series) => chart.metrics.includes(series.metric_key))
     .forEach((series, index) => {
@@ -48,6 +63,69 @@ export const buildRowsFromMetricSeries = (
       const dataKey = metricSeriesDataKey(series.metric_key, tags);
       const label = formatSeriesLabel(series.metric_key, tags, definitions, pingTaskMap, t);
       const kind = getMetricKind(series.metric_key, series.unit);
+      const isPing = isPingMetric(series.metric_key) || kind === "milliseconds";
+      const points = series.points ?? [];
+      const hasPointCounts = points.some(
+        (point) => typeof point.count === "number" && point.count > 0,
+      );
+      const lossMap = isPing ? pingLossByTagKey.get(metricTagsKey(tags)) : undefined;
+      const samples: Array<{ time: number; value: number | null }> | undefined = isPing
+        ? []
+        : undefined;
+
+      for (const point of points) {
+        const timestamp = new Date(point.time).toISOString();
+        const timeMs = new Date(point.time).getTime();
+        const rawValue = asMetricValue(point.value);
+
+        if (isPing) {
+          const lossPoint = lossMap?.get(timestamp);
+          const rawCount = point.count ?? lossPoint?.count;
+          // 跳过 fill_empty 在区间首尾生成的无采样占位点（count 缺失或为 0 且无有效值）
+          if (
+            hasPointCounts &&
+            (!rawCount || rawCount <= 0) &&
+            rawValue === null &&
+            (lossPoint?.value === null || lossPoint?.value === undefined)
+          ) {
+            continue;
+          }
+
+          const count =
+            typeof rawCount === "number" && rawCount > 0 ? rawCount : 1;
+          const lossRatio =
+            lossPoint &&
+            typeof lossPoint.value === "number" &&
+            Number.isFinite(lossPoint.value)
+              ? Math.min(1, Math.max(0, lossPoint.value))
+              : isLoss(rawValue)
+                ? 1
+                : 0;
+          const lostCount = Math.min(
+            count,
+            Math.max(0, Math.round(lossRatio * count)),
+          );
+          const validCount = count - lostCount;
+          const validSampleValue = isLoss(rawValue) ? null : rawValue;
+
+          for (let i = 0; i < validCount; i += 1) {
+            samples!.push({ time: timeMs, value: validSampleValue });
+          }
+          for (let i = 0; i < lostCount; i += 1) {
+            samples!.push({ time: timeMs, value: null });
+          }
+
+          const row = rows.get(timestamp) ?? { time: timestamp };
+          row[dataKey] =
+            lostCount >= count || isLoss(rawValue) ? null : rawValue;
+          rows.set(timestamp, row);
+        } else {
+          const row = rows.get(timestamp) ?? { time: timestamp };
+          row[dataKey] = rawValue;
+          rows.set(timestamp, row);
+        }
+      }
+
       renderSeries.push({
         dataKey,
         stableKey,
@@ -58,14 +136,8 @@ export const buildRowsFromMetricSeries = (
         pointCount: countMetricPoints(series),
         unit: series.unit,
         tags,
+        samples,
       });
-
-      for (const point of series.points ?? []) {
-        const timestamp = new Date(point.time).toISOString();
-        const row = rows.get(timestamp) ?? { time: timestamp };
-        row[dataKey] = asMetricValue(point.value);
-        rows.set(timestamp, row);
-      }
     });
 
   return {
@@ -277,10 +349,26 @@ export const buildChartView = ({
       )
     : metricBuilt;
   const built = prepareChartData(rawBuilt, chart.metrics, pingTaskMap);
-  const rows = trimMetricChartBoundaryRows(
+  const trimmedRows = trimMetricChartBoundaryRows(
     applyMetricEwma(built.rows, built.series, ewmaEnabled),
     built.series.map((item) => item.dataKey),
   );
+  const pingDataKeys = built.series
+    .filter((item) => isPingMetric(item.metricKey) || item.kind === "milliseconds")
+    .map((item) => item.dataKey);
+  const rows =
+    pingDataKeys.length === 0
+      ? trimmedRows
+      : trimmedRows.map((row) => {
+          let nextRow: MetricChartRow | null = null;
+          for (const dataKey of pingDataKeys) {
+            if (dataKey in row && isLoss(row[dataKey])) {
+              if (!nextRow) nextRow = { ...row };
+              nextRow[dataKey] = null;
+            }
+          }
+          return nextRow ?? row;
+        });
   return {
     series: built.series,
     axes: built.axes,

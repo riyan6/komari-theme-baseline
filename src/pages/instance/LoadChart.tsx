@@ -20,12 +20,6 @@ type LoadChartProps = {
   onRealtimeActiveChange?: (active: boolean) => void;
 };
 
-/*
-  详情页图表区：时间范围 → 六块固定指标图。
-  Swiss 主题隐藏了 S/M/L 尺寸、删除、拖拽、新增图表、重置、采样算法 / EWMA 控件；
-  相关的 useDashboard / useChartPreferences 状态定义保留在 loadChart/ 下，不在这里渲染入口。
-  采样算法固定使用默认值 avg。
-*/
 const SWISS_AGGREGATION = "avg" as const;
 
 const LoadChart = ({
@@ -42,8 +36,6 @@ const LoadChart = ({
   const timeRange = useTimeRange(maxMetricRetentionDays, onRealtimeActiveChange);
   const { isRealtime } = timeRange;
 
-  // memory / disk entries stay in the query list so data fetching and state remain intact;
-  // their ChartBlock display entries are hidden in swiss theme.
   const allCharts = useMemo<DashboardChart[]>(
     () => [
       {
@@ -152,6 +144,7 @@ const LoadChart = ({
                 t,
               })}
               height={height}
+              isCpu={chart.id === "cpu"}
               compactY={chart.id === "process"}
               isPing={chart.id === "ping"}
               displayRangeHours={timeRange.displayRangeHours}

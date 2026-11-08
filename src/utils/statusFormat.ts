@@ -4,6 +4,39 @@ import type { TFunction } from 'i18next'
  * Formatting utilities for the status dashboard
  */
 
+/**
+ * 将后端返回的旗帜 emoji（Unicode Regional Indicator Symbol，如 🇯🇵 / 🇺🇸）
+ * 还原为纯 ASCII 两位国家/地区代码（JP / US），避免 iOS / Android 等移动端渲染彩色国旗 emoji。
+ */
+export function normalizeRegionCode(region?: string | null): string {
+  if (!region) return ''
+  const trimmed = region.trim()
+  if (!trimmed) return ''
+  const chars = Array.from(trimmed)
+  if (chars.length === 2) {
+    const start = 0x1f1e6
+    const first = chars[0].codePointAt(0) ?? 0
+    const second = chars[1].codePointAt(0) ?? 0
+    if (
+      first >= start &&
+      first <= 0x1f1ff &&
+      second >= start &&
+      second <= 0x1f1ff
+    ) {
+      return String.fromCharCode(
+        first - start + 65,
+        second - start + 65
+      ).toUpperCase()
+    }
+  }
+  if (trimmed === '🇺🇳' || trimmed === '🌐') return 'UN'
+  return trimmed.toUpperCase()
+}
+
+export function formatRegionCode(region?: string | null): string {
+  return normalizeRegionCode(region) || '—'
+}
+
 export function formatCompactSpeed(bytesPerSec: number): string {
   if (bytesPerSec <= 0 || isNaN(bytesPerSec)) return '0 B/s'
   if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(0)} B/s`
@@ -21,19 +54,45 @@ export function formatCompactBytes(bytes: number): string {
   return `${(bytes / 1024 ** 4).toFixed(1)}T`
 }
 
-export function formatUptimeCompact(seconds: number, isZh?: boolean): string {
-  if (!seconds || seconds <= 0 || isNaN(seconds)) return isZh ? '0时' : '0h'
+export function formatUptimeCompact(seconds: number): string {
+  if (!seconds || seconds <= 0 || isNaN(seconds)) return '0m'
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
 
   if (days > 0) {
-    return isZh ? `${days}天${hours}时` : `${days}d${hours.toString().padStart(2, '0')}h`
+    return `${days}d ${hours}h ${minutes}m`
   }
   if (hours > 0) {
-    return isZh ? `${hours}时${minutes}分` : `${hours}h${minutes.toString().padStart(2, '0')}m`
+    return `${hours}h ${minutes}m`
   }
-  return isZh ? `${minutes}分` : `${minutes}m`
+  return `${minutes}m`
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+export function formatTzOffset(date: Date = new Date()): string {
+  const offsetMinutes = -date.getTimezoneOffset()
+  if (offsetMinutes === 0) return 'UTC+0'
+  const sign = offsetMinutes > 0 ? '+' : '-'
+  const abs = Math.abs(offsetMinutes)
+  const hours = Math.floor(abs / 60)
+  const minutes = abs % 60
+  return minutes > 0
+    ? `UTC${sign}${hours}:${pad2(minutes)}`
+    : `UTC${sign}${hours}`
+}
+
+export function formatDateTimeWithTz(value: string | number | Date): string {
+  const d = value instanceof Date ? value : new Date(value)
+  if (isNaN(d.getTime())) return '—'
+  const yyyy = d.getFullYear()
+  const mm = pad2(d.getMonth() + 1)
+  const dd = pad2(d.getDate())
+  const hh = pad2(d.getHours())
+  const min = pad2(d.getMinutes())
+  const ss = pad2(d.getSeconds())
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${formatTzOffset(d)}`
 }
 
 export function parseValidTimestampMs(ts?: string | number | null): number | null {

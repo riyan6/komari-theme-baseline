@@ -32,10 +32,14 @@
         }
 
         try {
-          // 字体由主题配置（theme_settings.fontFamily）决定，首屏先用默认字体，配置加载后覆盖。
-          document.documentElement.setAttribute("data-font", "space-grotesk");
+          // 字体由主题配置（theme_settings.displayFont / theme_settings.bodyFont）决定，首屏先用默认字体，配置加载后覆盖。
+          document.documentElement.setAttribute("data-font-display", "space-grotesk");
+          document.documentElement.setAttribute("data-font-body", "inter-tight");
+          document.documentElement.setAttribute("data-font", "inter-tight");
         } catch {
-          document.documentElement.setAttribute("data-font", "space-grotesk");
+          document.documentElement.setAttribute("data-font-display", "space-grotesk");
+          document.documentElement.setAttribute("data-font-body", "inter-tight");
+          document.documentElement.setAttribute("data-font", "inter-tight");
         }
       })();
     </script>

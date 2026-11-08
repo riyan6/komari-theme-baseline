@@ -8,6 +8,7 @@ import type {
 } from "@/types/metrics";
 
 export const PING_LATENCY_METRIC = "ping.latency_ms";
+export const PING_LOSS_METRIC = "ping.loss";
 
 export const METRIC_SERIES_COLORS = [
   "#2563EB",
@@ -96,6 +97,23 @@ export const normalizeMetricSeriesList = (series: MetricSeries[] | null | undefi
 
 export const isPingMetric = (metricKey: string) =>
   metricKey === "ping" || metricKey.startsWith("ping.");
+
+/**
+ * 判定延迟样本是否为丢包：
+ * 覆盖 null、undefined（字段缺失）、负数（如 -1）、0（0ms）以及缺失有效正数 value 字段的样本对象。
+ */
+export const isLoss = (sample: unknown): boolean => {
+  if (sample === null || sample === undefined) return true;
+  if (typeof sample === "number") {
+    return !Number.isFinite(sample) || sample <= 0;
+  }
+  if (typeof sample === "object") {
+    if (!("value" in sample)) return true;
+    const value = (sample as { value?: unknown }).value;
+    return typeof value !== "number" || !Number.isFinite(value) || value <= 0;
+  }
+  return true;
+};
 
 export const formatRemainingTags = (tags: MetricTags | undefined, excludedKeys: string[] = []) => {
   if (!hasTags(tags)) return "";

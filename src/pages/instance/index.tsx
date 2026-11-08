@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, useReducedMotion } from "motion/react";
@@ -6,6 +6,7 @@ import { useLiveData } from "../../contexts/LiveDataContext";
 import type { Record as LiveRecord } from "../../types/LiveData";
 import { useNodeList } from "@/contexts/NodeListContext";
 import { liveDataToRecords } from "@/utils/RecordHelper";
+import { formatDateTimeWithTz, formatRegionCode } from "@/utils/statusFormat";
 import { formatBytes, formatUptime } from "@/utils/unitHelper";
 import { api } from "@/lib/http";
 import KeyValueRow from "./components/KeyValueRow";
@@ -14,33 +15,7 @@ import LoadChart from "./LoadChart";
 const dash = (value: unknown) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
 
-/**
- * 详情页状态行只显示文字国家代码：后端 region 常是 🇯🇵 / 🇺🇸 这类旗帜 emoji，
- * 直接 toUpperCase 仍会交给系统彩色 emoji 字体渲染，和前后文不统一。
- * 这里把区域指示符 emoji 还原为 ISO 两位代码，确保使用全站 --font-sans。
- */
-const regionCode = (region?: string | null) => {
-  if (!region) return "—";
-  const chars = Array.from(region);
-  if (chars.length === 2) {
-    const start = 0x1f1e6;
-    const first = chars[0].codePointAt(0) ?? 0;
-    const second = chars[1].codePointAt(0) ?? 0;
-    if (
-      first >= start &&
-      first <= 0x1f1ff &&
-      second >= start &&
-      second <= 0x1f1ff
-    ) {
-      return String.fromCharCode(
-        first - start + 65,
-        second - start + 65,
-      ).toUpperCase();
-    }
-  }
-  if (region === "🇺🇳" || region === "🌐") return "UN";
-  return region.toUpperCase();
-};
+const regionCode = formatRegionCode;
 
 const bytesOrDash = (value?: number | null) =>
   typeof value === "number" && Number.isFinite(value)
@@ -62,10 +37,6 @@ export default function InstancePage() {
   const { uuid } = useParams<{ uuid: string }>();
   const reducedMotion = useReducedMotion();
 
-  /*
-    recent 记住它属于哪台服务器：切换服务器时不清空旧曲线，
-    旧曲线留在原地、由图表的骨架态淡出，新数据到达后再淡入——卡片高度不变，不会「闪一下」。
-  */
   const [recentState, setRecentState] = useState<{ uuid: string | null; list: LiveRecord[] }>({
     uuid: null,
     list: [],
@@ -73,6 +44,8 @@ export default function InstancePage() {
   const recent = recentState.list;
   const recentLoading = !!uuid && recentState.uuid !== uuid;
   const [chartRealtimeActive, setChartRealtimeActive] = useState(true);
+  const [copiedUuid, setCopiedUuid] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
   const { nodeList } = useNodeList();
   const length = 30 * 5;
 
@@ -85,6 +58,14 @@ export default function InstancePage() {
   );
   const handleChartRealtimeChange = useCallback((active: boolean) => {
     setChartRealtimeActive(active);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -108,7 +89,6 @@ export default function InstancePage() {
       .catch((err) => {
         if (err?.name !== "AbortError") {
           console.error("Failed to fetch recent data:", err);
-          // 失败也要结束加载态，否则骨架会一直挂着
           setRecentState({ uuid, list: [] });
         }
       });
@@ -124,11 +104,9 @@ export default function InstancePage() {
       if (!data) return;
 
       setRecentState((state) => {
-        // 历史还没拉到（或属于上一台服务器）时不追加，避免把新服务器的点接在旧曲线上
         if (state.uuid !== uuid) return state;
         const prev = state.list;
         const newRecord: LiveRecord = data;
-        // 检查是否已存在相同时间戳的记录
         const exists = prev.some(
           (item) => item.updated_at === newRecord.updated_at,
         );
@@ -146,7 +124,7 @@ export default function InstancePage() {
   const cpuUsage = liveRecord?.cpu.usage;
   const cpuValue =
     typeof cpuUsage === "number" && Number.isFinite(cpuUsage)
-      ? Math.round(cpuUsage)
+      ? cpuUsage
       : null;
   const cpuDanger = cpuValue !== null && cpuValue >= 80;
 
@@ -171,12 +149,20 @@ export default function InstancePage() {
     : "—";
   const lastUpdated = liveRecord?.updated_at || node?.updated_at;
   const lastUpdatedText = lastUpdated
-    ? new Date(lastUpdated).toLocaleString()
+    ? formatDateTimeWithTz(lastUpdated)
     : "—";
 
   const copyUuid = () => {
     if (!uuid) return;
     void navigator.clipboard?.writeText(uuid);
+    setCopiedUuid(true);
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = window.setTimeout(() => {
+      setCopiedUuid(false);
+      copyTimerRef.current = null;
+    }, 1500);
   };
 
   return (
@@ -209,18 +195,9 @@ export default function InstancePage() {
         transition={{ duration: reducedMotion ? 0 : 0.12, ease: "easeOut" }}
       >
         <header className="mt-4 border-b border-[color:var(--km-instance-hairline)] pb-6">
-          <h1 className="break-words text-[48px] font-bold leading-[0.95] tracking-[-0.04em] text-black sm:text-[clamp(56px,8vw,104px)] dark:text-[#F2F2F2]">
+          <h1 className="font-display break-words text-[48px] font-bold leading-[0.95] tracking-[-0.04em] text-black sm:text-[clamp(56px,8vw,104px)] dark:text-[#F2F2F2]">
             {dash(node?.name)}
           </h1>
-          {uuid && (
-            <button
-              type="button"
-              onClick={copyUuid}
-              className="type-control mt-3 block max-w-full cursor-pointer break-all text-left text-[color:var(--km-instance-muted)] transition-colors hover:text-black dark:hover:text-[#F2F2F2]"
-            >
-              {uuid}
-            </button>
-          )}
         </header>
 
         <div className="mt-8 grid grid-cols-1 gap-y-10 lg:grid-cols-12 lg:gap-x-12">
@@ -228,12 +205,12 @@ export default function InstancePage() {
             <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--km-instance-muted)]">
               CPU · {t("common.current")}
             </div>
-            <div className="mt-3 flex items-start leading-[0.9] tabular-nums">
+            <div className="font-display mt-3 flex items-start leading-[0.9] tabular-nums">
               <span
                 className="text-[clamp(80px,11vw,144px)] font-bold tracking-[-0.05em]"
                 style={{ color: cpuDanger ? "var(--km-instance-alert)" : "var(--km-instance-rule)" }}
               >
-                {cpuValue === null ? "—" : cpuValue}
+                {cpuValue === null ? "—" : cpuValue.toFixed(1)}
               </span>
               {cpuValue !== null && (
                 <span
@@ -297,6 +274,18 @@ export default function InstancePage() {
             />
           </div>
         </div>
+
+        {uuid && (
+          <div className="mt-10 pt-2">
+            <button
+              type="button"
+              onClick={copyUuid}
+              className="km-uuid block max-w-full cursor-pointer truncate whitespace-nowrap border-0 bg-transparent p-0 text-left text-[11px] leading-none text-[#6B6B6B] transition-colors hover:text-black dark:text-[#8C8C8C] dark:hover:text-[#F2F2F2]"
+            >
+              {copiedUuid ? "COPIED" : uuid}
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );

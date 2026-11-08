@@ -5,8 +5,23 @@ import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/noto-sans-sc";
 
 // Preload on-demand fonts before mount (inter-tight / space-grotesk are static; geist is lazy)
-const earlyFont = typeof document !== "undefined" ? document.documentElement.getAttribute("data-font") : null;
-if (earlyFont === "geist") {
+const earlyDisplayFont =
+  typeof document !== "undefined"
+    ? document.documentElement.getAttribute("data-font-display")
+    : null;
+const earlyBodyFont =
+  typeof document !== "undefined"
+    ? document.documentElement.getAttribute("data-font-body")
+    : null;
+const earlyFont =
+  typeof document !== "undefined"
+    ? document.documentElement.getAttribute("data-font")
+    : null;
+if (
+  earlyDisplayFont === "geist" ||
+  earlyBodyFont === "geist" ||
+  earlyFont === "geist"
+) {
   void import("@fontsource-variable/geist");
 }
 import "./global.css";

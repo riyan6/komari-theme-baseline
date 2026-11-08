@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { PingMetricStat } from "@/types/metrics";
 import {
+  isLoss,
   isPingMetric,
   pingMetricStatKey,
   pingTaskId,
@@ -24,9 +25,11 @@ type ChartBlockProps = {
   view: ChartView;
   /** 绘图区总高（含 X 轴刻度） */
   height?: number;
-  /** 进程数等小图：Y 轴取数据的最小/最大紧凑范围，不从 0 开始 */
+  /** CPU 图：Y 轴自适应上限 = max(10%, 数据最大值向上取整到整齐刻度)，刻度 3 个 */
+  isCpu?: boolean;
+  /** 进程数图：Y 轴使用整齐整数刻度（如 0 / 35 / 70） */
   compactY?: boolean;
-  /** 延迟图下方显示监控目标明细表 */
+  /** 延迟图：不显示上方图例，下方显示监控目标明细表 */
   isPing?: boolean;
   displayRangeHours?: number;
   pingStatsMap?: ReadonlyMap<string, PingMetricStat>;
@@ -53,8 +56,8 @@ const latestValueText = (view: ChartView) => {
     for (const item of view.series) {
       const value = row[item.dataKey];
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
-      // 延迟指标的负值是后端写入的丢包标记，不是真实延迟，最新值不能取它。
-      if (item.kind === "milliseconds" && value < 0) continue;
+      // 延迟指标的丢包样本不是真实延迟，最新值不能取它。
+      if (item.kind === "milliseconds" && isLoss(value)) continue;
       return formatValue(value, item.kind);
     }
   }
@@ -68,6 +71,12 @@ const valuesForAxis = (view: ChartView, axis: ChartAxis) => {
     for (const item of series) {
       const value = row[item.dataKey];
       if (typeof value === "number" && Number.isFinite(value)) {
+        if (
+          (axis.kind === "milliseconds" || isPingMetric(item.metricKey)) &&
+          isLoss(value)
+        ) {
+          continue;
+        }
         values.push(value);
       }
     }
@@ -75,37 +84,130 @@ const valuesForAxis = (view: ChartView, axis: ChartAxis) => {
   return values;
 };
 
-const axisDomain = (view: ChartView, axis: ChartAxis, compactY?: boolean) => {
+/** 向上取整到 1、2、5 × 10^n 整齐刻度 */
+const niceCeil125 = (value: number, min = 1): number => {
+  const target = Math.max(value, min);
+  const exp = Math.floor(Math.log10(target));
+  const base = 10 ** exp;
+  const normalized = target / base;
+  const factor =
+    normalized <= 1 + 1e-9
+      ? 1
+      : normalized <= 2 + 1e-9
+        ? 2
+        : normalized <= 5 + 1e-9
+          ? 5
+          : 10;
+  return factor * base;
+};
+
+const axisDomain = (
+  view: ChartView,
+  axis: ChartAxis,
+  isCpu?: boolean,
+  compactY?: boolean,
+) => {
+  const values = valuesForAxis(view, axis);
+  const maximum = values.length > 0 ? Math.max(0, ...values) : 0;
+
   if (axis.kind === "percent") {
+    if (isCpu) {
+      const niceMax = Math.min(100, Math.max(10, niceCeil125(maximum, 10)));
+      return {
+        domain: [0, niceMax] as [number, number],
+        ticks: [0, niceMax / 2, niceMax],
+      };
+    }
     return { domain: [0, 100] as [number, number], ticks: [0, 50, 100] };
   }
+
   if (axis.kind === "milliseconds") {
-    const values = valuesForAxis(view, axis);
-    const maximum = values.length > 0 ? Math.max(...values) : 0;
-    const niceMax = Math.max(50, Math.ceil(maximum / 50) * 50);
+    const niceMax = niceCeil125(maximum, 10);
     return {
       domain: [0, niceMax] as [number, number],
-      ticks: [0, Math.round(niceMax / 3), Math.round((niceMax * 2) / 3), niceMax],
+      ticks: [0, niceMax / 2, niceMax],
     };
   }
-  if (compactY && axis.kind === "count") {
-    const values = valuesForAxis(view, axis);
-    if (values.length === 0) {
-      return { domain: [0, 1] as [number, number], ticks: [0, 1] };
+
+  if (compactY || axis.kind === "count") {
+    let top: number;
+    if (maximum <= 10) {
+      top = Math.max(2, Math.ceil(maximum / 2) * 2);
+    } else if (maximum <= 100) {
+      top = Math.ceil(maximum / 10) * 10;
+    } else {
+      const step = niceCeil125(maximum / 2, 10);
+      top = step * 2;
     }
-    const low = Math.floor(Math.min(...values));
-    const high = Math.ceil(Math.max(...values));
-    const min = low === high ? low - 1 : low;
-    const max = low === high ? high + 1 : high;
-    return { domain: [min, max] as [number, number], ticks: [min, max] };
+    return {
+      domain: [0, top] as [number, number],
+      ticks: [0, Math.round(top / 2), top],
+    };
   }
-  return { domain: [0, "auto"] as [number, string], ticks: undefined };
+
+  if (axis.kind === "bytes" || axis.kind === "bytesPerSecond") {
+    const unitsMax = 5;
+    let unitIndex = 0;
+    let scaled = maximum;
+    while (scaled >= 1024 && unitIndex < unitsMax) {
+      scaled /= 1024;
+      unitIndex += 1;
+    }
+    const niceScaled = niceCeil125(scaled, 1);
+    const niceMax = niceScaled * 1024 ** unitIndex;
+    return {
+      domain: [0, niceMax] as [number, number],
+      ticks: [0, niceMax / 2, niceMax],
+    };
+  }
+
+  const niceMax = niceCeil125(maximum, 1);
+  return {
+    domain: [0, niceMax] as [number, number],
+    ticks: [0, niceMax / 2, niceMax],
+  };
+};
+
+const formatCleanByteAxis = (bytes: number, perSecond: boolean) => {
+  const suffix = perSecond ? "/s" : "";
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 B${suffix}`;
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const cleanNum = Number(size.toFixed(1));
+  return `${cleanNum} ${units[unitIndex]}${suffix}`;
+};
+
+const formatAxisTick = (value: number, kind: MetricKind): string => {
+  if (!Number.isFinite(value)) return "";
+  switch (kind) {
+    case "percent":
+      return `${Math.round(value)}%`;
+    case "count":
+      return `${Math.round(value)}`;
+    case "milliseconds":
+      return `${Math.round(value)} ms`;
+    case "bytes":
+      return formatCleanByteAxis(value, false);
+    case "bytesPerSecond":
+      return formatCleanByteAxis(value, true);
+    case "temperature":
+      return `${Number(value.toFixed(1))}°C`;
+    case "load":
+      return `${Number(value.toFixed(2))}`;
+    default:
+      return `${Number(value.toFixed(2))}`;
+  }
 };
 
 const xTicksForRows = (rows: ChartView["rows"]) => {
   const times = rows.map((row) => String(row.time));
   if (times.length <= 1) return times;
-  const count = Math.min(7, Math.max(5, times.length));
+  const count = Math.min(6, Math.max(4, times.length));
   const step = (times.length - 1) / (count - 1);
   return Array.from(
     new Set(Array.from({ length: count }, (_, index) => times[Math.round(index * step)])),
@@ -190,9 +292,10 @@ const LegendItem = ({
 };
 
 type LatencyBucket = {
-  state: "solid" | "hollow" | "empty";
+  state: "ok" | "loss" | "empty";
   avg: number | null;
   loss: number | null;
+  lossRatio: number;
   start: number;
   end: number;
 };
@@ -227,72 +330,94 @@ const buildLatencyTargets = (
     const stat =
       uuid && taskId ? pingStatsMap?.get(pingMetricStatKey(uuid, taskId)) : undefined;
 
-    /*
-      只统计「本目标自己的采样」：图上所有 ping 目标共用一行集合，其它目标的时间戳在这一列是 null，
-      不能算作本目标的丢包（之前按总行数算会得到 65.5% 这种假丢包）。
-      延迟为负值是后端写入的丢包标记（internal/metricstore/ping_records.go），不计入有效延迟。
-    */
-    const ownValues = rows
+    // 只统计本目标自己的采样点（不可把其它目标的时间戳算作本目标缺失）
+    const samples: Array<{ time: number; value: number | null }> =
+      series.samples && series.samples.length > 0
+        ? series.samples
+        : rows.reduce<Array<{ time: number; value: number | null }>>(
+            (acc, row, rowIndex) => {
+              if (series.dataKey in row) {
+                const raw = row[series.dataKey];
+                acc.push({
+                  time: times[rowIndex],
+                  value: isNumber(raw) ? raw : null,
+                });
+              }
+              return acc;
+            },
+            [],
+          );
+
+    const totalSamples = samples.length;
+    let totalLost = 0;
+    const validSampleValues: number[] = [];
+
+    for (const sample of samples) {
+      if (isLoss(sample)) {
+        totalLost += 1;
+      } else if (isNumber(sample.value)) {
+        validSampleValues.push(sample.value);
+      }
+    }
+
+    const rowValidValues = rows
       .map((row) => row[series.dataKey])
-      .filter(isNumber);
-    const validValues = ownValues.filter((value) => value >= 0);
-    const totalSamples = ownValues.length;
+      .filter((value): value is number => !isLoss(value) && isNumber(value));
 
     const fallbackAvg =
-      validValues.length > 0
-        ? validValues.reduce((sum, value) => sum + value, 0) / validValues.length
+      validSampleValues.length > 0
+        ? validSampleValues.reduce((sum, value) => sum + value, 0) /
+          validSampleValues.length
         : null;
     const fallbackJitter =
-      validValues.length > 1
-        ? validValues
+      rowValidValues.length > 1
+        ? rowValidValues
             .slice(1)
             .reduce(
               (sum, value, valueIndex) =>
-                sum + Math.abs(value - validValues[valueIndex]),
+                sum + Math.abs(value - rowValidValues[valueIndex]),
               0,
             ) /
-          (validValues.length - 1)
+          (rowValidValues.length - 1)
         : null;
-    const fallbackLoss =
-      totalSamples > 0
-        ? ((totalSamples - validValues.length) / totalSamples) * 100
-        : null;
+    // 条和表格的"丢包率"列统一使用共用函数 isLoss(sample) 计算
+    const loss =
+      totalSamples > 0 ? (totalLost / totalSamples) * 100 : null;
     const fallbackLast =
-      validValues.length > 0 ? validValues[validValues.length - 1] : null;
+      rowValidValues.length > 0
+        ? rowValidValues[rowValidValues.length - 1]
+        : null;
 
-    // 均值 / 丢包 / 最新值优先用后端 getPingMetricStats 的权威统计，避免从降采样行反推。
     const statAvg = stat?.avg;
-    const statLoss = stat?.loss;
     const statLatest = stat?.latest;
-    const avg = isNumber(statAvg) ? statAvg : fallbackAvg;
-    const loss = typeof statLoss === "number" ? statLoss : fallbackLoss;
-    const last = isNumber(statLatest) ? statLatest : fallbackLast;
-    // 后端未提供 jitter，用本目标自身的有效采样（排除负值丢包标记）计算平均绝对差。
+    const avg = !isLoss(statAvg) && isNumber(statAvg) ? statAvg : fallbackAvg;
+    const last =
+      !isLoss(statLatest) && isNumber(statLatest) ? statLatest : fallbackLast;
     const jitter = fallbackJitter;
 
     const buckets: LatencyBucket[] = Array.from({ length: 60 }, (_, bucketIndex) => {
       const bucketStart = start + (span * bucketIndex) / 60;
       const bucketEnd = start + (span * (bucketIndex + 1)) / 60;
-      const bucketSamples: number[] = [];
-      const bucketValid: number[] = [];
+      let bucketTotal = 0;
       let bucketLost = 0;
-      rows.forEach((row, rowIndex) => {
-        const time = times[rowIndex];
+      const bucketValid: number[] = [];
+
+      for (const sample of samples) {
         const inBucket =
           bucketIndex === 59
-            ? time >= bucketStart && time <= end
-            : time >= bucketStart && time < bucketEnd;
-        if (!inBucket) return;
-        const value = row[series.dataKey];
-        if (!isNumber(value)) return;
-        bucketSamples.push(value);
-        if (value >= 0) bucketValid.push(value);
-        else bucketLost += 1;
-      });
-      const bucketLoss =
-        bucketSamples.length > 0
-          ? (bucketLost / bucketSamples.length) * 100
-          : null;
+            ? sample.time >= bucketStart && sample.time <= end
+            : sample.time >= bucketStart && sample.time < bucketEnd;
+        if (!inBucket) continue;
+        bucketTotal += 1;
+        if (isLoss(sample)) {
+          bucketLost += 1;
+        } else if (isNumber(sample.value)) {
+          bucketValid.push(sample.value);
+        }
+      }
+
+      const lossRatio = bucketTotal > 0 ? bucketLost / bucketTotal : 0;
+      const bucketLoss = bucketTotal > 0 ? lossRatio * 100 : null;
       const bucketAvg =
         bucketValid.length > 0
           ? bucketValid.reduce((sum, value) => sum + value, 0) /
@@ -300,15 +425,15 @@ const buildLatencyTargets = (
           : null;
 
       let state: LatencyBucket["state"] = "empty";
-      if (bucketSamples.length > 0 && bucketValid.length > 0) {
-        if (bucketLoss === 0) state = "solid";
-        else if (bucketLoss !== null && bucketLoss < 50) state = "hollow";
+      if (bucketTotal > 0) {
+        state = bucketLost > 0 ? "loss" : "ok";
       }
 
       return {
         state,
         avg: bucketAvg,
         loss: bucketLoss,
+        lossRatio,
         start: bucketStart,
         end: bucketEnd,
       };
@@ -318,22 +443,8 @@ const buildLatencyTargets = (
   });
 };
 
-const formatBucketTime = (value: number, displayRangeHours?: number) => {
-  const date = new Date(value);
-  if (displayRangeHours && displayRangeHours >= 24) {
-    return date.toLocaleString([], {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-};
+const formatBucketTime = (value: number, displayRangeHours?: number) =>
+  labelFormatter(displayRangeHours)(value);
 
 const LATENCY_GRID_CLASS =
   "grid grid-cols-[minmax(0,1fr)_72px_72px_72px] sm:grid-cols-[minmax(0,1fr)_72px_72px_72px_72px] lg:grid-cols-[minmax(120px,1.4fr)_minmax(0,2fr)_72px_72px_72px_72px]";
@@ -343,11 +454,13 @@ const LatencyTargetTable = ({
   displayRangeHours,
   pingStatsMap,
   uuid,
+  activeSeriesKey,
 }: {
   view: ChartView;
   displayRangeHours?: number;
   pingStatsMap?: ReadonlyMap<string, PingMetricStat>;
   uuid?: string;
+  activeSeriesKey?: string | null;
 }) => {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState<{
@@ -385,6 +498,7 @@ const LatencyTargetTable = ({
 
       {targets.map((target) => {
         const warning = target.loss !== null && target.loss >= 2;
+        const isRowActive = activeSeriesKey === target.series.stableKey;
         const hoveredBucket =
           hovered?.targetIndex === target.index
             ? target.buckets[hovered.bucketIndex]
@@ -394,7 +508,11 @@ const LatencyTargetTable = ({
         return (
           <div
             key={target.series.stableKey}
-            className={`${LATENCY_GRID_CLASS} h-10 items-center border-b border-[color:var(--km-instance-hairline-soft)] sm:h-9`}
+            className={`${LATENCY_GRID_CLASS} h-10 items-center border-b border-[color:var(--km-instance-hairline-soft)] transition-colors sm:h-9 ${
+              isRowActive
+                ? "bg-[var(--km-ping-row-hover)]"
+                : "hover:bg-[var(--km-ping-row-hover)]"
+            }`}
           >
             <div className="flex min-w-0 items-center gap-2">
               <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true" className="shrink-0">
@@ -411,58 +529,68 @@ const LatencyTargetTable = ({
               <span className="truncate text-[13px] font-semibold">{target.series.label}</span>
             </div>
 
-            <div className="relative hidden min-w-0 lg:block">
+            <div className="relative hidden min-w-0 items-center lg:flex">
               <div
-                className="grid w-full"
+                className="grid h-[12px] w-full items-end"
                 style={{
                   gridTemplateColumns: "repeat(60, minmax(0, 1fr))",
                   gap: "1px",
                 }}
               >
                 {target.buckets.map((bucket, bucketIndex) => {
-                  const bucketColor = warning
+                  const lossColor = warning
                     ? "var(--km-instance-alert)"
-                    : "var(--km-chart-line)";
+                    : "var(--km-quality-loss)";
+                  const barHeight = Math.min(
+                    10,
+                    Math.max(4, Math.round(2 + bucket.lossRatio * 8)),
+                  );
+
                   return (
                     <span
                       key={bucketIndex}
-                      className="block h-[10px] w-full"
-                      style={
-                        bucket.state === "solid"
-                          ? {
-                              height: "10px",
-                              backgroundColor: "var(--km-chart-line)",
-                            }
-                          : bucket.state === "hollow"
-                            ? {
-                                height: "10px",
-                                border: `1px solid ${bucketColor}`,
-                                boxSizing: "border-box",
-                                backgroundColor: "transparent",
-                              }
-                            : {
-                                height: "10px",
-                                borderBottom: "2px solid #D0D0D0",
-                                boxSizing: "border-box",
-                              }
-                      }
+                      className="flex h-full w-full items-end"
                       onMouseEnter={() =>
                         setHovered({ targetIndex: target.index, bucketIndex })
                       }
                       onMouseLeave={() => setHovered(null)}
-                    />
+                    >
+                      {bucket.state === "ok" ? (
+                        <span
+                          className="block w-full"
+                          style={{
+                            height: "2px",
+                            backgroundColor: "var(--km-quality-baseline)",
+                          }}
+                        />
+                      ) : bucket.state === "loss" ? (
+                        <span
+                          className="block w-full"
+                          style={{
+                            height: `${barHeight}px`,
+                            backgroundColor: lossColor,
+                          }}
+                        />
+                      ) : null}
+                    </span>
                   );
                 })}
               </div>
               {hoveredBucket && (
                 <div
-                  className="pointer-events-none absolute left-0 top-full z-10 mt-1 whitespace-nowrap text-[10px] tabular-nums"
+                  className="pointer-events-none absolute left-0 top-full z-10 mt-0.5 whitespace-nowrap text-[10px] leading-none tabular-nums"
                   style={{ color: "var(--km-instance-muted)" }}
                 >
                   {formatBucketTime(hoveredBucket.start, displayRangeHours)}–
                   {formatBucketTime(hoveredBucket.end, displayRangeHours)} ·{" "}
-                  {hoveredBucket.avg === null ? "—" : `${Math.round(hoveredBucket.avg)} ms`} ·{" "}
-                  {hoveredBucket.loss === null ? "—" : `${hoveredBucket.loss.toFixed(1)}%`}
+                  {t("chart.lossRate")}{" "}
+                  {hoveredBucket.loss === null
+                    ? "—"
+                    : `${Number(hoveredBucket.loss.toFixed(1))}%`}{" "}
+                  · {t("chart.avgShort")}{" "}
+                  {hoveredBucket.avg === null
+                    ? "—"
+                    : `${Math.round(hoveredBucket.avg)} ms`}
                 </div>
               )}
             </div>
@@ -494,6 +622,7 @@ const ChartBlock = ({
   title,
   view,
   height = 180,
+  isCpu,
   compactY,
   isPing,
   displayRangeHours,
@@ -502,13 +631,60 @@ const ChartBlock = ({
   busy,
   last,
 }: ChartBlockProps) => {
+  const [activePingSeriesKey, setActivePingSeriesKey] = useState<string | null>(null);
   const xTicks = useMemo(() => xTicksForRows(view.rows), [view.rows]);
   const empty = view.rows.length === 0 || view.series.length === 0;
   const axisConfig = useMemo(
-    () => view.axes.map((axis) => ({ axis, ...axisDomain(view, axis, compactY) })),
-    [view, compactY],
+    () =>
+      view.axes.map((axis) => ({
+        axis,
+        ...axisDomain(view, axis, isCpu, compactY),
+      })),
+    [view, isCpu, compactY],
   );
-  const yTickCount = height <= 80 ? 2 : height <= 140 ? 3 : 4;
+  const yMax = useMemo(() => {
+    const first = axisConfig[0]?.domain?.[1];
+    return typeof first === "number" && first > 0 ? first : 100;
+  }, [axisConfig]);
+
+  const handleChartMouseMove = (state: {
+    activeTooltipIndex?: number;
+    chartY?: number;
+  }) => {
+    if (!isPing) return;
+    const rowIdx = state?.activeTooltipIndex;
+    if (typeof rowIdx !== "number" || rowIdx < 0 || rowIdx >= view.rows.length) {
+      return;
+    }
+    const row = view.rows[rowIdx];
+    const plotTop = 6;
+    const plotBottom = Math.max(plotTop + 1, height - 28);
+    const plotHeight = plotBottom - plotTop;
+    const mouseY = typeof state.chartY === "number" ? state.chartY : plotTop + plotHeight / 2;
+
+    let closestKey: string | null = null;
+    let closestDist = Number.POSITIVE_INFINITY;
+
+    for (const s of view.series) {
+      const val = row[s.dataKey];
+      if (typeof val !== "number" || !Number.isFinite(val) || isLoss(val)) continue;
+      const ratio = Math.min(1, Math.max(0, val / yMax));
+      const yPx = plotBottom - ratio * plotHeight;
+      const dist = Math.abs(yPx - mouseY);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestKey = s.stableKey;
+      }
+    }
+
+    setActivePingSeriesKey(closestKey);
+  };
+
+  const handleChartMouseLeave = () => {
+    if (isPing) {
+      setActivePingSeriesKey(null);
+    }
+  };
 
   return (
     <section
@@ -527,7 +703,7 @@ const ChartBlock = ({
         </span>
       </div>
 
-      {view.series.length > 0 && (
+      {!isPing && view.series.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           {view.series.map((item, index) => {
             const taskId = pingTaskId(item.tags);
@@ -560,6 +736,8 @@ const ChartBlock = ({
             <LineChart
               data={view.rows}
               margin={{ top: 6, right: 8, bottom: 0, left: 8 }}
+              onMouseMove={handleChartMouseMove}
+              onMouseLeave={handleChartMouseLeave}
             >
               <CartesianGrid
                 vertical={false}
@@ -569,8 +747,6 @@ const ChartBlock = ({
               <XAxis
                 dataKey="time"
                 ticks={xTicks}
-                tickFormatter={(value) => hoverTime(value, displayRangeHours)}
-                tick={{ fontSize: 11, fill: "var(--km-chart-tick)" }}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -578,6 +754,38 @@ const ChartBlock = ({
                 minTickGap={12}
                 interval={0}
                 padding={{ left: 0, right: 0 }}
+                tick={(props: {
+                  x?: number;
+                  y?: number;
+                  payload?: { value?: string | number };
+                  index?: number;
+                  visibleTicksCount?: number;
+                }) => {
+                  const {
+                    x = 0,
+                    y = 0,
+                    payload,
+                    index = 0,
+                    visibleTicksCount = 0,
+                  } = props;
+                  const rawValue = payload?.value;
+                  const isLast =
+                    (visibleTicksCount > 1 && index === visibleTicksCount - 1) ||
+                    (xTicks.length > 1 &&
+                      String(rawValue) === xTicks[xTicks.length - 1]);
+                  return (
+                    <text
+                      x={x}
+                      y={y}
+                      dy="0.71em"
+                      textAnchor={isLast ? "end" : "middle"}
+                      fill="var(--km-chart-tick)"
+                      fontSize={11}
+                    >
+                      {hoverTime(rawValue, displayRangeHours)}
+                    </text>
+                  );
+                }}
               />
               {axisConfig.map(({ axis, domain, ticks }) => (
                 <YAxis
@@ -586,13 +794,12 @@ const ChartBlock = ({
                   orientation={axis.orientation}
                   domain={domain}
                   ticks={ticks}
-                  tickCount={ticks ? undefined : yTickCount}
-                  width={46}
+                  width={52}
                   tickFormatter={(value) =>
-                    formatValue(Number(value), axis.kind as MetricKind).replace(
-                      / /g,
-                      "\u00a0",
-                    )
+                    formatAxisTick(
+                      Number(value),
+                      axis.kind as MetricKind,
+                    ).replace(/ /g, "\u00a0")
                   }
                   tick={{ fontSize: 11, fill: "var(--km-chart-tick)" }}
                   tickLine={false}
@@ -640,6 +847,9 @@ const ChartBlock = ({
                     fill="none"
                     connectNulls={false}
                     isAnimationActive={false}
+                    onMouseEnter={() => {
+                      if (isPing) setActivePingSeriesKey(item.stableKey);
+                    }}
                   />
                 );
               })}
@@ -655,6 +865,7 @@ const ChartBlock = ({
             displayRangeHours={displayRangeHours}
             pingStatsMap={pingStatsMap}
             uuid={uuid}
+            activeSeriesKey={activePingSeriesKey}
           />
         </div>
       )}

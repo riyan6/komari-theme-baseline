@@ -39,19 +39,18 @@ const NavBar: React.FC = () => {
   return (
     <header className="sticky top-0 z-30 w-full border-b border-black bg-white dark:border-[#262626] dark:bg-[#0A0A0A]">
       <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between px-6 sm:px-8 xl:px-12">
-        {/* Left: Status / Site Name */}
+        {/* Left: Site Name */}
         <Link
           to="/"
-          className="flex items-center gap-2.5 tracking-tight text-black transition dark:text-[#F2F2F2]"
+          className="flex items-center tracking-tight text-black transition dark:text-[#F2F2F2]"
         >
-          <span className={stale ? 'status-square-offline' : 'status-square-online'} />
           <span className="type-title">{siteName}</span>
         </Link>
 
         {/* Right Controls */}
         <div className="flex items-center gap-4 sm:gap-6">
-          {/* LIVE · 2s + 6px square */}
-          <div className="type-label flex items-center gap-2 text-[#6B6B6B] dark:text-[#8C8C8C]">
+          {/* LIVE · 2s + 6px square (uppercase only on label text, not value/unit) */}
+          <div className="flex items-center gap-2 text-[13px] font-semibold tracking-[0.05em] text-[#6B6B6B] dark:text-[#8C8C8C]">
             <span
               className={`${
                 stale
@@ -59,33 +58,41 @@ const NavBar: React.FC = () => {
                   : `status-square-online ${ticking ? 'live-tick' : ''}`
               }`}
             />
-            <span className="hidden sm:inline">{t('status.live')} · 2s</span>
+            <span className="hidden sm:inline">
+              <span className="uppercase">{t('status.live')}</span> · 2s
+            </span>
           </div>
 
-          {/* Language Switch: plain text EN / 中 with underline */}
-          <div className="type-meta flex items-center gap-1.5 text-[#6B6B6B] dark:text-[#8C8C8C]">
+          {/* Language Switch: weight 600 + 2px black underline */}
+          <div className="type-meta flex items-center gap-2 text-[#6B6B6B] dark:text-[#8C8C8C]">
             <button
               type="button"
               onClick={() => handleToggleLang('en')}
-              className={`cursor-pointer transition-colors hover:text-black dark:hover:text-white ${
+              className={`relative cursor-pointer pb-1 leading-none transition-colors hover:text-black dark:hover:text-[#F2F2F2] ${
                 !isZh
-                  ? 'text-black dark:text-white underline underline-offset-4 font-semibold'
-                  : 'text-[#6B6B6B] dark:text-[#8C8C8C]'
+                  ? 'font-semibold text-black dark:text-[#F2F2F2]'
+                  : 'font-medium text-[#6B6B6B] dark:text-[#8C8C8C]'
               }`}
             >
               EN
+              {!isZh && (
+                <span className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-black dark:bg-[#F2F2F2]" />
+              )}
             </button>
-            <span>/</span>
+            <span className="pb-1 leading-none">/</span>
             <button
               type="button"
               onClick={() => handleToggleLang('zh')}
-              className={`cursor-pointer transition-colors hover:text-black dark:hover:text-white ${
+              className={`relative cursor-pointer pb-1 leading-none transition-colors hover:text-black dark:hover:text-[#F2F2F2] ${
                 isZh
-                  ? 'text-black dark:text-white underline underline-offset-4 font-semibold'
-                  : 'text-[#6B6B6B] dark:text-[#8C8C8C]'
+                  ? 'font-semibold text-black dark:text-[#F2F2F2]'
+                  : 'font-medium text-[#6B6B6B] dark:text-[#8C8C8C]'
               }`}
             >
               中
+              {isZh && (
+                <span className="absolute inset-x-0 -bottom-[1px] h-[2px] bg-black dark:bg-[#F2F2F2]" />
+              )}
             </button>
           </div>
 

@@ -7,6 +7,8 @@ import type {
   QueryMetricsResponse,
 } from "@/types/metrics";
 import {
+  PING_LATENCY_METRIC,
+  PING_LOSS_METRIC,
   isPingMetric,
   normalizeMetricSeriesList,
   toPingMetricStatMap,
@@ -49,6 +51,9 @@ export function useMetricQueries({
         return !hasRealtimeSource(metricKey);
       }),
     );
+    if (keys.includes(PING_LATENCY_METRIC)) {
+      keys.push(PING_LOSS_METRIC);
+    }
     return Array.from(new Set(keys)).sort();
   }, [charts, isRealtime]);
 

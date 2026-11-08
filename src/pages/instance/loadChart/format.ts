@@ -3,6 +3,7 @@ import type { PublicPingTask } from "@/types/metrics";
 import {
   PING_LATENCY_METRIC,
   formatRemainingTags,
+  isLoss,
   isPingMetric,
   pingTaskId,
   pingTaskName,
@@ -69,7 +70,7 @@ export const formatValue = (value: unknown, kind: MetricKind) => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   switch (kind) {
     case "percent":
-      return `${value.toFixed(2)}%`;
+      return `${value.toFixed(1)}%`;
     case "bytes":
       return formatBytes(value);
     case "bytesPerSecond":
@@ -87,22 +88,21 @@ export const formatValue = (value: unknown, kind: MetricKind) => {
   }
 };
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 export const labelFormatter = (hours: number | undefined) => {
-  return (value: any) => {
-    const date = new Date(value);
+  return (value: unknown) => {
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return "";
+    const hh = pad2(date.getHours());
+    const min = pad2(date.getMinutes());
+    const ss = pad2(date.getSeconds());
     if (!hours || hours < 24) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+      return `${hh}:${min}:${ss}`;
     }
-    return date.toLocaleString([], {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const mm = pad2(date.getMonth() + 1);
+    const dd = pad2(date.getDate());
+    return `${mm}-${dd} ${hh}:${min}`;
   };
 };
 
@@ -115,7 +115,11 @@ export const getLatestText = (
     for (let seriesIndex = 0; seriesIndex < series.length; seriesIndex++) {
       const item = series[seriesIndex];
       const value = row[item.dataKey];
-      if (typeof value === "number" && Number.isFinite(value)) {
+      if (
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        !(item.kind === "milliseconds" && isLoss(value))
+      ) {
         return `${item.label}: ${formatValue(value, item.kind)}`;
       }
     }

@@ -2,7 +2,7 @@
   "name": "Komari Theme",
   "short": "komari-theme",
   "description": "Personal Komari theme (public status page).",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "riyan6",
   "url": "https://github.com/riyan6/komari-theme-baseline",
   "preview": "preview.webp",
@@ -23,20 +23,36 @@
         "type": "title"
       },
       {
-        "key": "fontFamily",
+        "key": "displayFont",
         "type": "select",
         "name": {
-          "en": "Font Style",
-          "zh-CN": "字体样式",
-          "ja": "フォントスタイル"
+          "en": "Display Font Style",
+          "zh-CN": "展示字体样式",
+          "ja": "表示フォントスタイル"
         },
         "help": {
-          "en": "Choose the font used across the theme.",
-          "zh-CN": "选择主题全局使用的字体。",
-          "ja": "テーマ全体で使用するフォントを選択します。"
+          "en": "Choose the font used for hero numbers, big metrics, and node titles.",
+          "zh-CN": "选择用于主数字、大指标数值和节点大标题的展示字体。",
+          "ja": "メイン数値、大きな指標、ノードタイトルに使用する表示フォントを選択します。"
         },
         "options": "Inter Tight,Geist,Space Grotesk",
         "default": "Space Grotesk"
+      },
+      {
+        "key": "bodyFont",
+        "type": "select",
+        "name": {
+          "en": "Body Font Style",
+          "zh-CN": "正文字体样式",
+          "ja": "本文フォントスタイル"
+        },
+        "help": {
+          "en": "Choose the font used for tables, labels, key-value rows, chart axes, and buttons.",
+          "zh-CN": "选择用于表格、标签、键值表、图表坐标轴和按钮的正文字体。",
+          "ja": "テーブル、ラベル、キー値表、チャート軸、ボタンに使用する本文フォントを選択します。"
+        },
+        "options": "Inter Tight,Geist,Space Grotesk",
+        "default": "Inter Tight"
       },
       {
         "key": "customFooterHtml",
